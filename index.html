@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Gestione Movimentatori</title>
+<link rel="stylesheet" href="styles.css?v=1">
+<script>
+  // Service Worker: aggiornamenti automatici, zero cache manuale
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      reg.addEventListener('updatefound', () => {
+        const sw = reg.installing;
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+            sw.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    });
+  }
+</script>
+</head>
+<body>
+
+<!-- ══ LOADING ════════════════════════════════════════════════════════════════ -->
+<div id="loadingScreen">
+  <div class="loadingBox">
+    <div class="loadingLogoWrap">
+      <div class="loadingLogoMark">
+        <svg viewBox="0 0 32 32" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+          <rect width="32" height="32" rx="4" fill="#A4D200"/>
+          <text x="16" y="21" font-family="'Barlow Condensed',sans-serif" font-size="15" font-weight="800" fill="#1C1F26" text-anchor="middle">M</text>
+        </svg>
+      </div>
+      <div>
+        <div class="loadLine1">MOVIMENTATORI</div>
+        <div class="loadLine2">Gestione missioni</div>
+      </div>
+    </div>
+    <div class="loadingDots"><span></span><span></span><span></span></div>
+  </div>
+</div>
+
+<!-- ══ LOGIN ══════════════════════════════════════════════════════════════════ -->
+<div id="loginScreen">
+  <div class="loginBox">
+    <div class="loginLogo">
+      <div class="logoWrap">
+        <div class="logoMark">
+          <svg viewBox="0 0 32 32" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+            <rect width="32" height="32" rx="4" fill="#1C1F26"/>
+            <text x="16" y="21" font-family="'Barlow Condensed',sans-serif" font-size="15" font-weight="800" fill="#A4D200" text-anchor="middle">M</text>
+          </svg>
+        </div>
+        <div>
+          <div class="line1">MOVIMENTATORI</div>
+          <div class="line2">Gestione missioni</div>
+        </div>
+      </div>
+      <p>Accedi al tuo account</p>
+    </div>
+    <div class="formGroup">
+      <label>Nome utente</label>
+      <input type="text" id="loginUser" placeholder="nomeutente" autocomplete="username" spellcheck="false">
+    </div>
+    <div class="formGroup">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btnPrimary" id="loginBtn" onclick="doLogin()">Accedi</button>
+    <div class="loginError" id="loginError"></div>
+  </div>
+</div>
+
+<!-- ══ APP ════════════════════════════════════════════════════════════════════ -->
+<div id="app">
+  <div class="topBar">
+    <div class="topBarLeft">
+      <div class="topBarLogo">Movimentatori</div>
+      <div class="topBarUser" id="topBarUser"></div>
+    </div>
+    <div class="topBarRight">
+      <span class="roleBadge" id="topRole">-</span>
+      <button class="btnLogout" onclick="doLogout()">Esci</button>
+    </div>
+  </div>
+
+  <!-- Nav a schede (filtrata per ruolo da app.js) -->
+  <nav class="tabNav" id="tabNav">
+    <button class="navBtn hidden" id="tab-nuova"    data-page="NuovaMissione" data-roles="operativo,amministratore">
+      <span class="navIcon">➕</span>Nuova</button>
+    <button class="navBtn hidden" id="tab-mie"      data-page="MieMissioni"   data-roles="operativo,amministratore">
+      <span class="navIcon">📋</span>Le mie</button>
+    <button class="navBtn hidden" id="tab-coda"     data-page="Coda"          data-roles="autista,amministratore">
+      <span class="navIcon">🚚</span>Coda</button>
+    <button class="navBtn hidden" id="tab-incorso"  data-page="InCorso"       data-roles="autista,amministratore">
+      <span class="navIcon">🔵</span>In corso</button>
+    <button class="navBtn hidden" id="tab-storico"  data-page="Storico"       data-roles="amministrativo,amministratore">
+      <span class="navIcon">🗂️</span>Storico</button>
+    <button class="navBtn hidden" id="tab-stats"    data-page="Statistiche"   data-roles="amministrativo,amministratore">
+      <span class="navIcon">📊</span>Statistiche</button>
+    <button class="navBtn hidden" id="tab-anag"     data-page="Anagrafiche"   data-roles="amministratore">
+      <span class="navIcon">🗃️</span>Anagrafiche</button>
+    <button class="navBtn hidden" id="tab-utenti"   data-page="Utenti"        data-roles="amministratore">
+      <span class="navIcon">👥</span>Utenti</button>
+  </nav>
+
+  <!-- ── PAGINA: NUOVA MISSIONE (operativo) ──────────────────────────────────── -->
+  <div class="page" id="pageNuovaMissione">
+    <div class="pageHeader">Nuova missione</div>
+    <div class="pageSubtitle">Prenota lo spostamento di un elemento dal magazzino a una linea</div>
+    <div class="card">
+      <div class="field">
+        <label>Elemento da spostare</label>
+        <select id="nm-elemento"><option value="">— seleziona —</option></select>
+      </div>
+      <div class="field">
+        <label>Origine (magazzino)</label>
+        <select id="nm-origine"><option value="">— seleziona —</option></select>
+      </div>
+      <div class="field">
+        <label>Destinazione (linea)</label>
+        <select id="nm-destinazione"><option value="">— seleziona —</option></select>
+      </div>
+      <button class="btnGreen" id="nm-btn" onclick="creaMissione()">✓ Crea missione</button>
+    </div>
+  </div>
+
+  <!-- ── PAGINA: LE MIE MISSIONI (operativo) ─────────────────────────────────── -->
+  <div class="page" id="pageMieMissioni">
+    <div class="pageHeader">Le mie missioni</div>
+    <div class="pageSubtitle">Dichiara i vuoti sulle consegne arrivate e gestisci le tue richieste</div>
+    <div id="mie-list"><div class="emptyState">Caricamento…</div></div>
+  </div>
+
+  <!-- ── PAGINA: CODA (navetta/autista) ──────────────────────────────────────── -->
+  <div class="page" id="pageCoda">
+    <div class="pageHeader">Coda missioni</div>
+    <div class="pageSubtitle">Pieni da consegnare e vuoti da riportare — seleziona cosa svolgere</div>
+    <div class="statsRow" id="coda-stats"></div>
+    <div id="coda-list"><div class="emptyState">Caricamento…</div></div>
+  </div>
+
+  <!-- ── PAGINA: IN CORSO (navetta/autista) ──────────────────────────────────── -->
+  <div class="page" id="pageInCorso">
+    <div class="pageHeader">In corso</div>
+    <div class="pageSubtitle">Le missioni che hai preso in carico — conferma quando arrivi</div>
+    <div id="incorso-list"><div class="emptyState">Caricamento…</div></div>
+  </div>
+
+  <!-- ── PAGINA: STORICO (amministrativo/amministratore) ─────────────────────── -->
+  <div class="page" id="pageStorico">
+    <div class="pageHeader">Storico movimenti</div>
+    <div class="pageSubtitle">Tutte le azioni registrate</div>
+    <div class="filterBar">
+      <input type="text" id="st-cerca" placeholder="Cerca elemento / ubicazione…" oninput="renderStorico()">
+      <select id="st-azione" onchange="renderStorico()"><option value="">Tutte le azioni</option></select>
+    </div>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>Data</th><th>Azione</th><th>Elemento</th><th>Percorso</th><th>Utente</th></tr></thead>
+        <tbody id="st-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── PAGINA: STATISTICHE (amministrativo/amministratore) ─────────────────── -->
+  <div class="page" id="pageStatistiche">
+    <div class="pageHeader">Statistiche</div>
+    <div class="pageSubtitle">Panoramica delle movimentazioni</div>
+    <div class="statsRow" id="stat-cards"></div>
+    <div class="card">
+      <div class="cardTitle">Elementi più movimentati</div>
+      <div id="stat-topElementi"></div>
+    </div>
+    <div class="card">
+      <div class="cardTitle">Attività per ubicazione</div>
+      <div id="stat-topUbic"></div>
+    </div>
+  </div>
+
+  <!-- ── PAGINA: ANAGRAFICHE (amministratore) ────────────────────────────────── -->
+  <div class="page" id="pageAnagrafiche">
+    <div class="pageHeader">Anagrafiche</div>
+    <div class="pageSubtitle">Elementi e ubicazioni — modificabili in qualsiasi momento</div>
+
+    <div class="card">
+      <div class="cardTitle">Elementi</div>
+      <div class="field" style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" id="el-codice" placeholder="Codice (es. CAR-01)" style="flex:1" onkeydown="if(event.key==='Enter')addElemento()">
+        <input type="text" id="el-desc" placeholder="Descrizione (facolt.)" style="flex:2">
+        <button class="btnGreen btnSmall" onclick="addElemento()">+ Aggiungi</button>
+      </div>
+      <div id="el-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="cardTitle">Ubicazioni</div>
+      <div class="field" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <input type="text" id="ub-nome" placeholder="Nome (es. Scaffale A / Linea 3)" style="flex:2;min-width:140px" onkeydown="if(event.key==='Enter')addUbicazione()">
+        <select id="ub-tipo" style="flex:1;min-width:120px">
+          <option value="magazzino">Magazzino</option>
+          <option value="linea">Linea</option>
+        </select>
+        <button class="btnGreen btnSmall" onclick="addUbicazione()">+ Aggiungi</button>
+      </div>
+      <div id="ub-list"></div>
+    </div>
+  </div>
+
+  <!-- ── PAGINA: UTENTI (amministratore) ─────────────────────────────────────── -->
+  <div class="page" id="pageUtenti">
+    <div class="pageHeader">Utenti</div>
+    <div class="pageSubtitle">Gestione account e ruoli</div>
+    <button class="btnGreen btnSmall" style="margin-bottom:14px" onclick="openModal('modalAddUser')">+ Nuovo utente</button>
+    <div id="user-list"></div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Modale nuovo utente -->
+<div class="modalOverlay" id="modalAddUser" onclick="if(event.target===this)closeModal('modalAddUser')">
+  <div class="modalBox">
+    <h3>Nuovo utente</h3>
+    <div class="field"><label>Nome completo</label><input type="text" id="nu-name" placeholder="Mario Rossi"></div>
+    <div class="field"><label>Username</label><input type="text" id="nu-username" placeholder="mrossi" spellcheck="false"></div>
+    <div class="field"><label>Email</label><input type="email" id="nu-email" placeholder="mario@esempio.it" spellcheck="false"></div>
+    <div class="field"><label>Password (min. 6)</label><input type="password" id="nu-pass" placeholder="••••••"></div>
+    <div class="field"><label>Ruolo</label>
+      <select id="nu-role">
+        <option value="operativo">Operativo</option>
+        <option value="autista">Autista (navetta)</option>
+        <option value="amministrativo">Amministrativo</option>
+        <option value="amministratore">Amministratore</option>
+      </select>
+    </div>
+    <div class="modalActions">
+      <button class="btnGray" onclick="closeModal('modalAddUser')">Annulla</button>
+      <button class="btnGreen" onclick="addUser()">Crea</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function hasProfile() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    function roleOf() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isAdmin() { return hasProfile() && roleOf() == 'amministratore'; }
+
+    // Lookup pubblico username → email (necessario per il login via username)
+    match /usernames/{username} {
+      allow read: if true;
+      allow create, update, delete: if signedIn();
+    }
+
+    // Profili utente: ognuno crea il proprio (in registrazione); ruoli li cambia l'admin
+    match /users/{uid} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Anagrafiche: lette da tutti gli autenticati, scritte solo dall'amministratore
+    match /elementi/{id}   { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /ubicazioni/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+
+    // Missioni e rientri: operatività quotidiana di tutti i ruoli autenticati
+    match /missioni/{id} { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+    match /rientri/{id}  { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+
+    // Storico: append da tutti, modifica/cancellazione solo admin
+    match /history/{id} { allow read: if signedIn(); allow create: if signedIn(); allow update, delete: if isAdmin(); }
+  }
+}
