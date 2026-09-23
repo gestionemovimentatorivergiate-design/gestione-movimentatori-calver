@@ -95,14 +95,10 @@
 
   <!-- Nav a schede (filtrata per ruolo da app.js) -->
   <nav class="tabNav" id="tabNav">
-    <button class="navBtn hidden" id="tab-nuova"    data-page="NuovaMissione" data-roles="operativo,amministratore">
-      <span class="navIcon">➕</span>Nuova</button>
-    <button class="navBtn hidden" id="tab-mie"      data-page="MieMissioni"   data-roles="operativo,amministratore">
-      <span class="navIcon">📋</span>Le mie</button>
-    <button class="navBtn hidden" id="tab-coda"     data-page="Coda"          data-roles="autista,amministratore">
-      <span class="navIcon">🚚</span>Coda</button>
-    <button class="navBtn hidden" id="tab-incorso"  data-page="InCorso"       data-roles="autista,amministratore">
-      <span class="navIcon">🔵</span>In corso</button>
+    <button class="navBtn hidden" id="tab-pren"     data-page="Prenotazioni"  data-roles="operativo,amministratore">
+      <span class="navIcon">📋</span>Prenotazioni</button>
+    <button class="navBtn hidden" id="tab-incorso"  data-page="InCorso"       data-roles="movimentatore,amministratore">
+      <span class="navIcon">🚚</span>In corso</button>
     <button class="navBtn hidden" id="tab-storico"  data-page="Storico"       data-roles="amministrativo,amministratore">
       <span class="navIcon">🗂️</span>Storico</button>
     <button class="navBtn hidden" id="tab-stats"    data-page="Statistiche"   data-roles="amministrativo,amministratore">
@@ -113,11 +109,12 @@
       <span class="navIcon">👥</span>Utenti</button>
   </nav>
 
-  <!-- ── PAGINA: NUOVA MISSIONE (operativo) ──────────────────────────────────── -->
-  <div class="page" id="pageNuovaMissione">
-    <div class="pageHeader">Nuova missione</div>
-    <div class="pageSubtitle">Prenota lo spostamento di un elemento dal magazzino a una linea</div>
+  <!-- ── PAGINA: PRENOTAZIONI (operativo / amministratore) ───────────────────── -->
+  <div class="page" id="pagePrenotazioni">
+    <div class="pageHeader">Prenotazioni</div>
+    <div class="pageSubtitle">Crea una missione e gestisci quelle create</div>
     <div class="card">
+      <div class="cardTitle">Nuova missione</div>
       <div class="field">
         <label>Elemento da spostare</label>
         <select id="nm-elemento"><option value="">— seleziona —</option></select>
@@ -132,27 +129,15 @@
       </div>
       <button class="btnGreen" id="nm-btn" onclick="creaMissione()">✓ Crea missione</button>
     </div>
-  </div>
-
-  <!-- ── PAGINA: LE MIE MISSIONI (operativo) ─────────────────────────────────── -->
-  <div class="page" id="pageMieMissioni">
-    <div class="pageHeader">Le mie missioni</div>
-    <div class="pageSubtitle">Dichiara i vuoti sulle consegne arrivate e gestisci le tue richieste</div>
     <div id="mie-list"><div class="emptyState">Caricamento…</div></div>
   </div>
 
-  <!-- ── PAGINA: CODA (navetta/autista) ──────────────────────────────────────── -->
-  <div class="page" id="pageCoda">
-    <div class="pageHeader">Coda missioni</div>
-    <div class="pageSubtitle">Pieni da consegnare e vuoti da riportare — seleziona cosa svolgere</div>
-    <div class="statsRow" id="coda-stats"></div>
-    <div id="coda-list"><div class="emptyState">Caricamento…</div></div>
-  </div>
-
-  <!-- ── PAGINA: IN CORSO (navetta/autista) ──────────────────────────────────── -->
+  <!-- ── PAGINA: IN CORSO (movimentatore / amministratore) ───────────────────── -->
+  <!-- Unifica coda e presi in carico: giallo = da prendere, verde = da confermare -->
   <div class="page" id="pageInCorso">
     <div class="pageHeader">In corso</div>
-    <div class="pageSubtitle">Le missioni che hai preso in carico — conferma quando arrivi</div>
+    <div class="pageSubtitle">Prendi in carico dalla coda e conferma all'arrivo</div>
+    <div class="statsRow" id="incorso-stats"></div>
     <div id="incorso-list"><div class="emptyState">Caricamento…</div></div>
   </div>
 
@@ -240,7 +225,7 @@
     <div class="field"><label>Ruolo</label>
       <select id="nu-role">
         <option value="operativo">Operativo</option>
-        <option value="autista">Autista (navetta)</option>
+        <option value="movimentatore">Movimentatore</option>
         <option value="amministrativo">Amministrativo</option>
         <option value="amministratore">Amministratore</option>
       </select>

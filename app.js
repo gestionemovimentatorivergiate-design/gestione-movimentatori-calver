@@ -19,7 +19,7 @@ import {
 
 import { showToast } from './shared-utils.js';
 import { initOperativo, renderNuovaMissione, renderMieMissioni } from './modules/operativo.js';
-import { initNavetta, renderCoda, renderInCorso } from './modules/navetta.js';
+import { initNavetta, renderInCorso } from './modules/navetta.js';
 import { initAnagrafiche, renderElementi, renderUbicazioni } from './modules/anagrafiche.js';
 import { initAdmin, renderStorico, renderStatistiche, renderUtenti } from './modules/admin.js';
 
@@ -57,9 +57,7 @@ window.showPage = showPage;
 // Ridisegna la pagina attualmente visibile con i dati correnti
 function refreshCurrentPage() {
   switch (currentPage) {
-    case 'NuovaMissione': renderNuovaMissione(); break;
-    case 'MieMissioni':   renderMieMissioni();   break;
-    case 'Coda':          renderCoda();          break;
+    case 'Prenotazioni':  renderNuovaMissione(); renderMieMissioni(); break;
     case 'InCorso':       renderInCorso();       break;
     case 'Storico':       renderStorico();       break;
     case 'Statistiche':   renderStatistiche();   break;

@@ -86,7 +86,7 @@ body {
 .topBarUser { font-size: 12px; color: var(--shell-muted); }
 .topBarRight { display: flex; align-items: center; gap: 8px; }
 .roleBadge { border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; border: 1px solid; }
-.roleBadge.autista { color: var(--accent); border-color: #A4D20044; background: #A4D20011; }
+.roleBadge.movimentatore { color: var(--accent); border-color: #A4D20044; background: #A4D20011; }
 .roleBadge.operativo { color: #a78bfa; border-color: #a78bfa44; background: #a78bfa11; }
 .roleBadge.amministrativo { color: var(--orange); border-color: #f59e0b44; background: #f59e0b11; }
 .roleBadge.amministratore { color: var(--accent); border-color: #A4D20044; background: #A4D20011; }
