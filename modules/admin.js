@@ -196,5 +196,14 @@ window.addUser = async function () {
 window.renderStorico = renderStorico;
 
 // ── Helper modale ────────────────────────────────────────────────────────────
-window.openModal = function (id) { document.getElementById(id)?.classList.add('open'); };
+window.openModal = function (id) {
+  // La finestra "Nuovo utente" parte sempre pulita
+  if (id === 'modalAddUser') {
+    ['nu-name', 'nu-username', 'nu-email', 'nu-pass'].forEach(f => {
+      const el = document.getElementById(f); if (el) el.value = '';
+    });
+    const role = document.getElementById('nu-role'); if (role) role.value = 'operativo';
+  }
+  document.getElementById(id)?.classList.add('open');
+};
 window.closeModal = function (id) { document.getElementById(id)?.classList.remove('open'); };
