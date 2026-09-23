@@ -128,7 +128,7 @@ export function renderUtenti() {
         <div class="rowSub">${esc(u.username || '')}${u.email ? ' · ' + esc(u.email) : ''}</div>
       </div>
       <select class="btnGhost" style="max-width:150px" onchange="changeRole('${u.uid}',this.value)">
-        ${['operativo', 'autista', 'amministrativo', 'amministratore'].map(r =>
+        ${['operativo', 'movimentatore', 'amministrativo', 'amministratore'].map(r =>
           `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r}</option>`).join('')}
       </select>
       <button class="btnIcon" title="Elimina" onclick="deleteUser('${u.uid}','${esc(u.name || u.email)}')">🗑</button>
