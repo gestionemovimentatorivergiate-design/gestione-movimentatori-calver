@@ -2,7 +2,7 @@
 // Ruolo AMMINISTRATIVO (sola lettura): Storico + Statistiche.
 // Ruolo AMMINISTRATORE: anche gestione Utenti.
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { initializeApp, deleteApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { firebaseConfig } from '../firebase-config.js';
 import {
   getAuth, createUserWithEmailAndPassword, signOut
@@ -167,14 +167,18 @@ window.addUser = async function () {
     const exists = await getDoc(doc(window.db, 'usernames', username));
     if (exists.exists()) { showToast('Username già in uso.', 'error'); return; }
 
+    // Istanza Firebase secondaria temporanea: crea l'account senza toccare
+    // la sessione dell'amministratore corrente.
     const secondaryApp = initializeApp(firebaseConfig, 'secondary-' + Date.now());
     const secondaryAuth = getAuth(secondaryApp);
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
     const uid = cred.user.uid;
     await setDoc(doc(window.db, 'users', uid), { name, email, role, username });
     await setDoc(doc(window.db, 'usernames', username), { email });
-    await signOut(secondaryAuth);
-    await secondaryApp.delete();
+
+    // Pulizia dell'istanza temporanea: se fallisce, non deve invalidare la creazione.
+    try { await signOut(secondaryAuth); } catch (e) {}
+    try { await deleteApp(secondaryApp); } catch (e) {}
 
     showToast(`Utente ${name} creato.`, 'success');
     ['nu-name', 'nu-username', 'nu-email', 'nu-pass'].forEach(id => document.getElementById(id).value = '');
