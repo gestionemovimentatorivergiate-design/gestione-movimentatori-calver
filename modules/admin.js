@@ -10,7 +10,7 @@ import {
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { showToast, esc, fmtDate } from '../shared-utils.js';
+import { showToast, esc, fmtDate, tsVal } from '../shared-utils.js';
 
 let _getState, _getUser;
 
@@ -83,11 +83,17 @@ export function renderStatistiche() {
   const consegnate = st.missioni.filter(m => m.stato === 'consegnata').length;
   const rientrati = st.rientri.filter(r => r.stato === 'rientrato').length;
 
+  // Durata media: pieni (creazione missione → consegna) e vuoti (creazione rientro → rientro)
+  const avgPieni = _durataMedia(st.missioni.filter(m => m.consegnataAt), 'createdAt', 'consegnataAt');
+  const avgVuoti = _durataMedia(st.rientri.filter(r => r.rientratoAt), 'createdAt', 'rientratoAt');
+
   cards.innerHTML = `
     <div class="statCard orange"><div class="val">${missAttive}</div><div class="lbl">Pieni in corso</div></div>
     <div class="statCard blue"><div class="val">${rientAttivi}</div><div class="lbl">Vuoti in corso</div></div>
     <div class="statCard green"><div class="val">${consegnate}</div><div class="lbl">Consegne totali</div></div>
-    <div class="statCard green"><div class="val">${rientrati}</div><div class="lbl">Rientri totali</div></div>`;
+    <div class="statCard green"><div class="val">${rientrati}</div><div class="lbl">Rientri totali</div></div>
+    <div class="statCard orange"><div class="val">${_fmtDurMs(avgPieni)}</div><div class="lbl">Durata media consegna (pieni)</div></div>
+    <div class="statCard blue"><div class="val">${_fmtDurMs(avgVuoti)}</div><div class="lbl">Durata media rientro (vuoti)</div></div>`;
 
   // Top elementi (per numero di missioni create)
   const cntEl = {};
@@ -101,6 +107,31 @@ export function renderStatistiche() {
     cntUb[m.destinazioneNome] = (cntUb[m.destinazioneNome] || 0) + 1;
   });
   _renderBar('stat-topUbic', cntUb);
+}
+
+// Media (in ms) della differenza tra due timestamp su una lista di documenti.
+// Ignora i record senza entrambi i tempi o con durata negativa. null se vuoto.
+function _durataMedia(arr, startField, endField) {
+  const durate = arr.map(x => {
+    const s = tsVal(x[startField]);
+    const e = tsVal(x[endField]);
+    return (s && e && e >= s) ? (e - s) : null;
+  }).filter(v => v != null);
+  if (!durate.length) return null;
+  return durate.reduce((a, b) => a + b, 0) / durate.length;
+}
+
+// Formatta una durata in millisecondi in forma leggibile (min / h / g).
+function _fmtDurMs(ms) {
+  if (ms == null) return '—';
+  const totMin = Math.round(ms / 60000);
+  if (totMin < 1) return '<1 min';
+  if (totMin < 60) return totMin + ' min';
+  const h = Math.floor(totMin / 60);
+  const m = totMin % 60;
+  if (h < 24) return h + 'h ' + m + 'min';
+  const d = Math.floor(h / 24);
+  return d + 'g ' + (h % 24) + 'h';
 }
 
 function _renderBar(elId, counts) {
