@@ -162,6 +162,20 @@ async function doLogout() { await signOut(window.auth); }
 window.doLogin = doLogin;
 window.doLogout = doLogout;
 
+// Mostra/nascondi la password nel campo di login
+window.togglePass = function () {
+  const inp = document.getElementById('loginPass');
+  const btn = document.getElementById('pwToggle');
+  if (!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  if (btn) {
+    btn.textContent = show ? '🙈' : '👁️';
+    btn.classList.toggle('on', show);
+    btn.setAttribute('aria-label', show ? 'Nascondi password' : 'Mostra password');
+  }
+};
+
 function showLogin() {
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';

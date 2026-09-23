@@ -68,8 +68,12 @@
     </div>
     <div class="formGroup">
       <label>Password</label>
-      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"
-             onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="pwWrap">
+        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" class="pwToggle" id="pwToggle" aria-label="Mostra password"
+                onclick="togglePass()">👁️</button>
+      </div>
     </div>
     <button class="btnPrimary" id="loginBtn" onclick="doLogin()">Accedi</button>
     <div class="loginError" id="loginError"></div>
