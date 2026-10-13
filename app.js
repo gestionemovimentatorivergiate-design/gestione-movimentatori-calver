@@ -26,8 +26,7 @@ import { initAdmin, renderStorico, renderStatistiche, renderUtenti } from './mod
 // ── STATO CONDIVISO ─────────────────────────────────────────────────────────
 let currentUser = null;
 const state = {
-  missioni: [],     // pieni: magazzino → linea
-  rientri: [],      // vuoti: linea → magazzino
+  missioni: [],
   elementi: [],
   buildings: [],
   ubicazioni: [],
@@ -86,10 +85,6 @@ function startListeners() {
   _unsub.push(onSnapshot(query(collection(db, 'missioni'), orderBy('createdAt', 'desc')),
     snap => { state.missioni = snap.docs.map(d => ({ id: d.id, ...d.data() })); refreshCurrentPage(); },
     err => console.error('Errore missioni:', err)));
-
-  _unsub.push(onSnapshot(query(collection(db, 'rientri'), orderBy('createdAt', 'desc')),
-    snap => { state.rientri = snap.docs.map(d => ({ id: d.id, ...d.data() })); refreshCurrentPage(); },
-    err => console.error('Errore rientri:', err)));
 
   _unsub.push(onSnapshot(query(collection(db, 'elementi'), orderBy('__name__')),
     snap => { state.elementi = snap.docs.map(d => ({ id: d.id, ...d.data() })); refreshCurrentPage(); },
