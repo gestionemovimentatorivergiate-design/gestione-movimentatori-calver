@@ -79,11 +79,16 @@ function _card(item) {
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#2563eb;color:#fff;letter-spacing:.3px">🔵 LINEA BLU</span>'
     : '';
 
+  const badgeVuoto = item.vuoto
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#6b7280;color:#fff;letter-spacing:.3px">⚪ VUOTO</span>'
+    : '';
+
   return `
     <div class="mCard pieno"${blu ? ' style="border-left:4px solid #2563eb;"' : ''}>
       <div class="mHead">
         <span class="mElemento">${esc(item.elementoCodice)}</span>
         ${badgeBlu}
+        ${badgeVuoto}
         ${statoBadge}
       </div>
       <div class="mRoute"><span class="mLoc">${esc(item.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(item.destinazioneNome)}</span></div>

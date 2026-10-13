@@ -6,6 +6,8 @@
 // missioni/{id} : elemento + origine/destinazione + stato
 //    stato: richiesta → in_transito → consegnata   (+ annullata da 'richiesta')
 //    lineaBlu: true se la missione è prioritaria (spunta "Linea Blu"); assente = false
+//    vuoto: true se è una missione di vuoto (spunta "Vuoto"); assente = false. Non cambia
+//           l'ordinamento. Vuoto e Linea Blu sono mutuamente esclusive.
 
 import {
   collection, doc, addDoc, updateDoc, serverTimestamp
@@ -61,26 +63,64 @@ export function renderNuovaMissione() {
       btn.parentNode.insertBefore(wrap, btn);
     }
   }
-  orSel.onchange = _aggiornaLineaBlu;
-  _aggiornaLineaBlu();
+
+  // Spunta "Vuoto": sempre cliccabile (salvo incompatibilità con Linea Blu)
+  if (!document.getElementById('nm-vuoto')) {
+    const anchor = document.getElementById('nm-lineablu-wrap') || document.getElementById('nm-btn');
+    if (anchor && anchor.parentNode) {
+      const wrap = document.createElement('label');
+      wrap.id = 'nm-vuoto-wrap';
+      wrap.style.cssText = 'display:flex;align-items:center;gap:10px;margin:12px 0;padding:10px 12px;' +
+        'border:1px solid #6b728066;border-radius:8px;background:#6b728012;cursor:pointer;' +
+        'font-weight:700;user-select:none';
+      wrap.innerHTML = '<input type="checkbox" id="nm-vuoto" style="width:20px;height:20px;margin:0;accent-color:#6b7280;cursor:pointer">' +
+        '<span>⚪ Vuoto</span>' +
+        '<span id="nm-vuoto-hint" style="font-size:11px;font-weight:500;color:var(--muted);margin-left:auto"></span>';
+      anchor.parentNode.insertBefore(wrap, anchor.id === 'nm-btn' ? anchor : anchor.nextSibling);
+    }
+  }
+  orSel.onchange = _aggiornaSpunte;
+  const cbBlu = document.getElementById('nm-lineablu'); if (cbBlu) cbBlu.onchange = _aggiornaSpunte;
+  const cbVuoto = document.getElementById('nm-vuoto');  if (cbVuoto) cbVuoto.onchange = _aggiornaSpunte;
+  _aggiornaSpunte();
 }
 
 // Linea Blu: la spunta è attiva solo se l'origine appartiene a questo Building
 const LINEA_BLU_BUILDING = 'B26';
 
-// Abilita/disabilita la spunta in base all'origine selezionata
-function _aggiornaLineaBlu() {
-  const cb = document.getElementById('nm-lineablu');
-  if (!cb) return;
+// Aggiorna le due spunte. Regole:
+//  • Linea Blu: cliccabile solo con origine del building B26 e se "Vuoto" NON è spuntato
+//  • Vuoto: sempre cliccabile, tranne quando "Linea Blu" è spuntata
+// Le due spunte sono quindi mutuamente esclusive.
+function _aggiornaSpunte() {
+  const cbBlu = document.getElementById('nm-lineablu');
+  const cbVuoto = document.getElementById('nm-vuoto');
+  if (!cbBlu || !cbVuoto) return;
+
   const orId = document.getElementById('nm-origine')?.value;
   const ub = _getState().ubicazioni.find(x => x.id === orId);
-  const ok = !!ub && ub.buildingId === LINEA_BLU_BUILDING;
-  cb.disabled = !ok;
-  if (!ok) cb.checked = false;
-  const wrap = document.getElementById('nm-lineablu-wrap');
-  if (wrap) { wrap.style.opacity = ok ? '1' : '.5'; wrap.style.cursor = ok ? 'pointer' : 'not-allowed'; }
-  const hint = document.getElementById('nm-lineablu-hint');
-  if (hint) hint.textContent = ok ? '' : `Solo per origini del building ${LINEA_BLU_BUILDING}`;
+  const origineOk = !!ub && ub.buildingId === LINEA_BLU_BUILDING;
+
+  // Se l'origine non è B26 la Linea Blu non può restare spuntata
+  if (!origineOk) cbBlu.checked = false;
+
+  const bluOk = origineOk && !cbVuoto.checked;
+  const vuotoOk = !cbBlu.checked;
+  cbBlu.disabled = !bluOk;
+  cbVuoto.disabled = !vuotoOk;
+
+  const setStyle = (id, ok) => {
+    const w = document.getElementById(id);
+    if (w) { w.style.opacity = ok ? '1' : '.5'; w.style.cursor = ok ? 'pointer' : 'not-allowed'; }
+  };
+  setStyle('nm-lineablu-wrap', bluOk);
+  setStyle('nm-vuoto-wrap', vuotoOk);
+
+  const hBlu = document.getElementById('nm-lineablu-hint');
+  if (hBlu) hBlu.textContent = bluOk ? ''
+    : (cbVuoto.checked ? 'Non compatibile con Vuoto' : `Solo per origini del building ${LINEA_BLU_BUILDING}`);
+  const hVuoto = document.getElementById('nm-vuoto-hint');
+  if (hVuoto) hVuoto.textContent = vuotoOk ? '' : 'Non compatibile con Linea Blu';
 }
 
 // Badge + stile per le missioni Linea Blu (priorità)
@@ -88,6 +128,11 @@ const BLU_BORDER = 'border-left:4px solid #2563eb;';
 function _badgeBlu(m) {
   return m.lineaBlu
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#2563eb;color:#fff;letter-spacing:.3px">🔵 LINEA BLU</span>'
+    : '';
+}
+function _badgeVuoto(m) {
+  return m.vuoto
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#6b7280;color:#fff;letter-spacing:.3px">⚪ VUOTO</span>'
     : '';
 }
 function _styleBlu(m) { return m.lineaBlu ? ` style="${BLU_BORDER}"` : ''; }
@@ -106,7 +151,9 @@ window.creaMissione = async function () {
   if (!elemento || !origine || !destinazione) { showToast('Dati non validi, riprova.', 'error'); return; }
 
   // Linea Blu valida solo se l'origine appartiene al building B26
-  const lineaBlu = !!document.getElementById('nm-lineablu')?.checked
+  const vuoto = !!document.getElementById('nm-vuoto')?.checked;
+  // Mutuamente esclusive: se è spuntato Vuoto, la Linea Blu non viene mai salvata
+  const lineaBlu = !vuoto && !!document.getElementById('nm-lineablu')?.checked
     && origine.buildingId === LINEA_BLU_BUILDING;
 
   const btn = document.getElementById('nm-btn');
@@ -116,7 +163,7 @@ window.creaMissione = async function () {
       elementoId: elId, elementoCodice: elemento.codice,
       origineId: orId, origineNome: origine.nome,
       destinazioneId: deId, destinazioneNome: destinazione.nome,
-      lineaBlu,
+      lineaBlu, vuoto,
       stato: 'richiesta',
       navettaId: null, navettaNome: null,
       ownerUid: u.uid, ownerNome: u.name || u.email,
@@ -125,15 +172,16 @@ window.creaMissione = async function () {
     await window.logHistory({
       action: 'Missione creata', elemento: elemento.codice,
       origine: origine.nome, destinazione: destinazione.nome,
-      lineaBlu,
+      lineaBlu, vuoto,
     });
-    showToast(`Missione${lineaBlu ? ' LINEA BLU' : ''} creata: ${elemento.codice} → ${destinazione.nome}`, 'success');
+    showToast(`Missione${lineaBlu ? ' LINEA BLU' : ''}${vuoto ? ' VUOTO' : ''} creata: ${elemento.codice} → ${destinazione.nome}`, 'success');
     // Reset selezioni
     document.getElementById('nm-elemento').value = '';
     document.getElementById('nm-origine').value = '';
     document.getElementById('nm-destinazione').value = '';
     const cb = document.getElementById('nm-lineablu'); if (cb) cb.checked = false;
-    _aggiornaLineaBlu();
+    const cv = document.getElementById('nm-vuoto'); if (cv) cv.checked = false;
+    _aggiornaSpunte();
   } catch (e) {
     showToast('Errore: ' + e.message, 'error');
   } finally {
@@ -169,6 +217,7 @@ function _cardMissioneAttesa(m) {
       <div class="mHead">
         <span class="mElemento">${esc(m.elementoCodice)}</span>
         ${_badgeBlu(m)}
+        ${_badgeVuoto(m)}
         <span class="mStatoBadge richiesta">In attesa</span>
       </div>
       <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
