@@ -61,11 +61,7 @@ function _azBadge(a) {
     'Missione creata':      'blue',
     'Pieno preso in carico':'orange',
     'Consegna completata':  'green',
-    'Vuoto dichiarato':     'blue',
-    'Vuoto preso in carico':'orange',
-    'Rientro completato':   'green',
     'Missione annullata':   'red',
-    'Vuoto annullato':      'red',
   };
   const color = map[a] || 'muted';
   const bg = { blue: '#3b82f613;color:#1d4ed8', orange: '#f59e0b13;color:#b45309', green: '#A4D20018;color:#7fa000', red: '#ef444413;color:#dc2626', muted: 'transparent;color:#6b7280' }[color];
@@ -79,21 +75,15 @@ export function renderStatistiche() {
   if (!cards) return;
 
   const missAttive = st.missioni.filter(m => m.stato === 'richiesta' || m.stato === 'in_transito').length;
-  const rientAttivi = st.rientri.filter(r => r.stato === 'da_rientrare' || r.stato === 'in_transito').length;
   const consegnate = st.missioni.filter(m => m.stato === 'consegnata').length;
-  const rientrati = st.rientri.filter(r => r.stato === 'rientrato').length;
 
-  // Durata media: pieni (creazione missione → consegna) e vuoti (creazione rientro → rientro)
+  // Durata media: creazione missione → consegna
   const avgPieni = _durataMedia(st.missioni.filter(m => m.consegnataAt), 'createdAt', 'consegnataAt');
-  const avgVuoti = _durataMedia(st.rientri.filter(r => r.rientratoAt), 'createdAt', 'rientratoAt');
 
   cards.innerHTML = `
-    <div class="statCard orange"><div class="val">${missAttive}</div><div class="lbl">Pieni in corso</div></div>
-    <div class="statCard blue"><div class="val">${rientAttivi}</div><div class="lbl">Vuoti in corso</div></div>
+    <div class="statCard orange"><div class="val">${missAttive}</div><div class="lbl">Missioni in corso</div></div>
     <div class="statCard green"><div class="val">${consegnate}</div><div class="lbl">Consegne totali</div></div>
-    <div class="statCard green"><div class="val">${rientrati}</div><div class="lbl">Rientri totali</div></div>
-    <div class="statCard orange"><div class="val">${_fmtDurMs(avgPieni)}</div><div class="lbl">Durata media consegna (pieni)</div></div>
-    <div class="statCard blue"><div class="val">${_fmtDurMs(avgVuoti)}</div><div class="lbl">Durata media rientro (vuoti)</div></div>`;
+    <div class="statCard blue"><div class="val">${_fmtDurMs(avgPieni)}</div><div class="lbl">Durata media consegna</div></div>`;
 
   // Top elementi (per numero di missioni create)
   const cntEl = {};

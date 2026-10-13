@@ -1,18 +1,14 @@
 // ── modules/operativo.js ──────────────────────────────────────────────────────
 // Ruolo OPERATIVO:
-//  1) crea la missione (pieno: magazzino → linea)
-//  2) dichiara il vuoto sulle consegne arrivate → genera il rientro (linea → magazzino)
-//  3) annulla le proprie missioni/rientri ancora IN ATTESA (mai in transito)
+//  1) crea la missione (da un'ubicazione a un'altra)
+//  2) annulla le proprie missioni ancora IN ATTESA (mai in transito)
 //
 // missioni/{id} : elemento + origine/destinazione + stato
 //    stato: richiesta → in_transito → consegnata   (+ annullata da 'richiesta')
-//    vuotoId: riferimento al rientro generato (null finché non dichiarato)
 //    lineaBlu: true se la missione è prioritaria (spunta "Linea Blu"); assente = false
-// rientri/{id}  : il vuoto, collegato da missioneId ↔ missioni.vuotoId
-//    stato: da_rientrare → in_transito → rientrato  (+ annullato da 'da_rientrare')
 
 import {
-  collection, doc, addDoc, updateDoc, writeBatch, serverTimestamp
+  collection, doc, addDoc, updateDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { showToast, esc, fmtDate, tsVal } from '../shared-utils.js';
 
@@ -124,7 +120,6 @@ window.creaMissione = async function () {
       stato: 'richiesta',
       navettaId: null, navettaNome: null,
       ownerUid: u.uid, ownerNome: u.name || u.email,
-      vuotoId: null,
       createdAt: serverTimestamp(), presaInCaricoAt: null, consegnataAt: null,
     });
     await window.logHistory({
@@ -153,53 +148,18 @@ export function renderMieMissioni() {
   const st = _getState();
   const u = _getUser();
 
-  // 1) Consegne da dichiarare vuoto (qualsiasi operativo può dichiarare)
-  const daVuoto = st.missioni
-    .filter(m => m.stato === 'consegnata' && !m.vuotoId)
-    .sort((a, b) => (a.consegnataAt?.toDate?.() || 0) - (b.consegnataAt?.toDate?.() || 0));
-
-  // 2) Mie missioni ancora in attesa (annullabili)
+  // Mie missioni ancora in attesa (annullabili)
   // Linea Blu in alto, poi per anzianità (la più vecchia prima)
   const mieRichieste = st.missioni
     .filter(m => m.stato === 'richiesta' && m.ownerUid === u.uid)
     .sort((a, b) => (b.lineaBlu ? 1 : 0) - (a.lineaBlu ? 1 : 0) || tsVal(a.createdAt) - tsVal(b.createdAt));
 
-  // 3) Miei rientri ancora in attesa (annullabili)
-  const mieiRientri = st.rientri.filter(r => r.stato === 'da_rientrare' && r.ownerUid === u.uid);
-
-  let html = '';
-
-  html += `<div class="groupTitle">Da dichiarare vuoto (${daVuoto.length})</div>`;
-  html += daVuoto.length
-    ? daVuoto.map(_cardDaVuoto).join('')
-    : '<div class="emptyState">Nessuna consegna in attesa di dichiarazione vuoto.</div>';
-
-  if (mieRichieste.length) {
-    html += `<div class="groupTitle">Mie missioni in attesa (${mieRichieste.length})</div>`;
-    html += mieRichieste.map(_cardMissioneAttesa).join('');
-  }
-  if (mieiRientri.length) {
-    html += `<div class="groupTitle">Miei vuoti in attesa (${mieiRientri.length})</div>`;
-    html += mieiRientri.map(_cardRientroAttesa).join('');
-  }
+  html += `<div class="groupTitle">Mie missioni in attesa (${mieRichieste.length})</div>`;
+  html += mieRichieste.length
+    ? mieRichieste.map(_cardMissioneAttesa).join('')
+    : '<div class="emptyState">Nessuna missione in attesa.</div>';
 
   el.innerHTML = html;
-}
-
-function _cardDaVuoto(m) {
-  return `
-    <div class="mCard pieno"${_styleBlu(m)}>
-      <div class="mHead">
-        <span class="mElemento">${esc(m.elementoCodice)}</span>
-        ${_badgeBlu(m)}
-        <span class="mStatoBadge consegnata">Consegnata</span>
-      </div>
-      <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
-      <div class="mMeta">Consegnata: ${fmtDate(m.consegnataAt)}${m.navettaNome ? ' · da ' + esc(m.navettaNome) : ''}</div>
-      <div class="mActions">
-        <button class="btnOrange" onclick="dichiaraVuoto('${m.id}')">🟢 Dichiara vuoto</button>
-      </div>
-    </div>`;
 }
 
 function _cardMissioneAttesa(m) {
@@ -218,55 +178,6 @@ function _cardMissioneAttesa(m) {
     </div>`;
 }
 
-function _cardRientroAttesa(r) {
-  return `
-    <div class="mCard vuoto">
-      <div class="mHead">
-        <span class="mElemento">${esc(r.elementoCodice)}</span>
-        <span class="mTipoBadge vuoto">Vuoto</span>
-        <span class="mStatoBadge da_rientrare">Da rientrare</span>
-      </div>
-      <div class="mRoute"><span class="mLoc">${esc(r.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(r.destinazioneNome)}</span></div>
-      <div class="mMeta">Dichiarato: ${fmtDate(r.createdAt)}</div>
-      <div class="mActions">
-        <button class="btnGray" onclick="annullaRientro('${r.id}')">✕ Annulla</button>
-      </div>
-    </div>`;
-}
-
-// ── AZIONE: dichiara vuoto → crea rientro + collega la missione ───────────────
-window.dichiaraVuoto = async function (missioneId) {
-  const u = _getUser();
-  const m = _getState().missioni.find(x => x.id === missioneId);
-  if (!m) { showToast('Missione non trovata.', 'error'); return; }
-  if (m.stato !== 'consegnata' || m.vuotoId) { showToast('Missione non più disponibile.', 'error'); return; }
-
-  try {
-    const batch = writeBatch(window.db);
-    const rientroRef = doc(collection(window.db, 'rientri'));
-    batch.set(rientroRef, {
-      missioneId: m.id,
-      elementoId: m.elementoId, elementoCodice: m.elementoCodice,
-      // Rientro = percorso inverso: dalla linea (dest della missione) al magazzino (origine)
-      origineId: m.destinazioneId, origineNome: m.destinazioneNome,
-      destinazioneId: m.origineId, destinazioneNome: m.origineNome,
-      stato: 'da_rientrare',
-      navettaId: null, navettaNome: null,
-      ownerUid: u.uid, ownerNome: u.name || u.email,
-      createdAt: serverTimestamp(), presaInCaricoAt: null, rientratoAt: null,
-    });
-    batch.update(doc(window.db, 'missioni', m.id), { vuotoId: rientroRef.id });
-    await batch.commit();
-    await window.logHistory({
-      action: 'Vuoto dichiarato', elemento: m.elementoCodice,
-      origine: m.destinazioneNome, destinazione: m.origineNome,
-    });
-    showToast(`Vuoto dichiarato: ${m.elementoCodice} rientra a ${m.origineNome}`, 'success');
-  } catch (e) {
-    showToast('Errore: ' + e.message, 'error');
-  }
-};
-
 // ── AZIONE: annulla missione (solo 'richiesta', owner o admin) ────────────────
 window.annullaMissione = async function (id) {
   const u = _getUser();
@@ -279,24 +190,5 @@ window.annullaMissione = async function (id) {
     await updateDoc(doc(window.db, 'missioni', id), { stato: 'annullata', annullataAt: serverTimestamp() });
     await window.logHistory({ action: 'Missione annullata', elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
     showToast('Missione annullata.', 'success');
-  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
-};
-
-// ── AZIONE: annulla rientro (solo 'da_rientrare', owner o admin) ──────────────
-// Sblocca la missione collegata (vuotoId = null) così il vuoto può essere ridichiarato.
-window.annullaRientro = async function (id) {
-  const u = _getUser();
-  const r = _getState().rientri.find(x => x.id === id);
-  if (!r) return;
-  if (r.stato !== 'da_rientrare') { showToast('Annullabile solo finché è in attesa.', 'error'); return; }
-  if (r.ownerUid !== u.uid && u.role !== 'amministratore') { showToast('Puoi annullare solo i tuoi vuoti.', 'error'); return; }
-  if (!confirm(`Annullare il rientro vuoto di ${r.elementoCodice}?`)) return;
-  try {
-    const batch = writeBatch(window.db);
-    batch.update(doc(window.db, 'rientri', id), { stato: 'annullato', annullatoAt: serverTimestamp() });
-    if (r.missioneId) batch.update(doc(window.db, 'missioni', r.missioneId), { vuotoId: null });
-    await batch.commit();
-    await window.logHistory({ action: 'Vuoto annullato', elemento: r.elementoCodice, origine: r.origineNome, destinazione: r.destinazioneNome });
-    showToast('Rientro vuoto annullato.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
