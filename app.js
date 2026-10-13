@@ -95,12 +95,15 @@ function startListeners() {
     snap => { state.elementi = snap.docs.map(d => ({ id: d.id, ...d.data() })); refreshCurrentPage(); },
     err => console.error('Errore elementi:', err)));
 
-  _unsub.push(onSnapshot(query(collection(db, 'buildings'), orderBy('__name__')),
-    snap => { state.buildings = snap.docs.map(d => ({ id: d.id, ...d.data() })); refreshCurrentPage(); },
-    err => console.error('Errore buildings:', err)));
-
   _unsub.push(onSnapshot(query(collection(db, 'ubicazioni'), orderBy('__name__')),
-    snap => { state.ubicazioni = snap.docs.map(d => ({ id: d.id, ...d.data() })); refreshCurrentPage(); },
+    snap => {
+      // I Building sono salvati nella stessa collezione (tipo: 'building'):
+      // qui vengono separati dalle ubicazioni vere (magazzino / linea).
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.buildings  = all.filter(x => x.tipo === 'building');
+      state.ubicazioni = all.filter(x => x.tipo !== 'building');
+      refreshCurrentPage();
+    },
     err => console.error('Errore ubicazioni:', err)));
 
   // Storico e utenti solo per chi ne ha bisogno (amministrativo/amministratore)
