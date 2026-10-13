@@ -155,6 +155,10 @@
       <button class="btnGray btnSmall" onclick="resetFiltriStorico()">✕ Azzera filtri</button>
     </div>
     <div class="pageSubtitle" id="st-count" style="margin-top:-4px"></div>
+    <!-- Visibile solo all'amministratore (nascosto/mostrato da admin.js) -->
+    <div style="margin-bottom:12px">
+      <button class="btnGray btnSmall" id="st-reset" style="display:none;color:#dc2626;border:1.5px solid #dc2626" onclick="eliminaStorico()">🗑 ELIMINA DATI STORICI</button>
+    </div>
     <div class="tableWrap">
       <table>
         <thead><tr><th>Data</th><th>Azione</th><th>ID missione</th><th>Elemento</th><th>Percorso</th><th>Utente</th></tr></thead>
