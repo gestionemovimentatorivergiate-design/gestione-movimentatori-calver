@@ -120,11 +120,11 @@
         <select id="nm-elemento"><option value="">— seleziona —</option></select>
       </div>
       <div class="field">
-        <label>Origine (magazzino)</label>
+        <label>Origine</label>
         <select id="nm-origine"><option value="">— seleziona —</option></select>
       </div>
       <div class="field">
-        <label>Destinazione (linea)</label>
+        <label>Destinazione</label>
         <select id="nm-destinazione"><option value="">— seleziona —</option></select>
       </div>
       <button class="btnGreen" id="nm-btn" onclick="creaMissione()">✓ Crea missione</button>
@@ -203,10 +203,6 @@
       <div class="field" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <input type="text" id="ub-nome" placeholder="Nome (es. Scaffale A / Linea 3)" style="flex:2;min-width:140px" onkeydown="if(event.key==='Enter')addUbicazione()">
         <select id="ub-building" style="flex:1;min-width:140px"><option value="">— building —</option></select>
-        <select id="ub-tipo" style="flex:1;min-width:120px">
-          <option value="magazzino">Magazzino</option>
-          <option value="linea">Linea</option>
-        </select>
         <button class="btnGreen btnSmall" onclick="addUbicazione()">+ Aggiungi</button>
       </div>
       <div id="ub-list"></div>
