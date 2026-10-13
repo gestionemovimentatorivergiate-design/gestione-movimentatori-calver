@@ -57,9 +57,13 @@ export function renderStorico() {
   // Una missione compare se almeno una sua voce rispetta TUTTI i filtri (AND);
   // della missione si vedono poi tutti gli stati.
   const chiave = h => h.codice || ('_' + h.id);
+  // Il filtro Stato guarda lo stato ATTUALE della missione (la sua voce più recente)
+  const tvH = h => h.ts ? h.ts.getTime() : Number.MAX_SAFE_INTEGER;
+  const ultimo = new Map();
+  H.forEach(h => { const k = chiave(h), o = ultimo.get(k); if (!o || tvH(h) >= tvH(o)) ultimo.set(k, h); });
   const trovate = new Set(H.filter(h =>
     (!nessunFiltro || !h.ts || h.ts.getTime() >= da) &&
-    (!fAz  || stato(h) === fAz) &&
+    (!fAz  || stato(ultimo.get(chiave(h))) === fAz) &&
     (!fUt  || utente(h) === fUt) &&
     (!fPer || percorso(h) === fPer) &&
     (!fEl  || h.elemento === fEl) &&
