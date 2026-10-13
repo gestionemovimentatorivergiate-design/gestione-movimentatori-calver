@@ -21,6 +21,8 @@ export function initAdmin({ getState, getUser }) {
 }
 
 // ── STORICO ──────────────────────────────────────────────────────────────────
+let _storicoRows = [];   // righe attualmente visibili (dopo i filtri)
+
 export function renderStorico() {
   const body = document.getElementById('st-body');
   if (!body) return;
@@ -46,21 +48,36 @@ export function renderStorico() {
   const fId = (document.getElementById('st-id')?.value || '').trim().toLowerCase();
   const giorno = h => h.ts ? h.ts.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }) : '';
 
+  // Nessun filtro attivo → si mostrano solo i movimenti dell'ultima settimana.
+  // Con almeno un filtro attivo la ricerca copre tutte le voci caricate.
+  const nessunFiltro = !fAz && !fUt && !fPer && !fEl && !fData && !fId;
+  const da = Date.now() - 7 * 24 * 3600 * 1000;
+
   // Tutti i filtri attivi si combinano (AND)
   const rows = H.filter(h =>
+    (!nessunFiltro || !h.ts || h.ts.getTime() >= da) &&
     (!fAz  || h.action === fAz) &&
     (!fUt  || utente(h) === fUt) &&
     (!fPer || percorso(h) === fPer) &&
     (!fEl  || h.elemento === fEl) &&
     (!fData || giorno(h) === fData) &&
     (!fId  || (h.codice || '').toLowerCase().includes(fId)));
+  _storicoRows = rows;      // righe visibili: sono quelle che scarica il pulsante Excel
 
   // Pulsante "Elimina dati storici": visibile solo all'amministratore
   const btnReset = document.getElementById('st-reset');
   if (btnReset) btnReset.style.display = (_getUser()?.role === 'amministratore') ? 'inline-flex' : 'none';
 
   const cnt = document.getElementById('st-count');
-  if (cnt) cnt.textContent = `${rows.length} di ${H.length} movimenti caricati`;
+  if (cnt) {
+    const lim = _getState().historyLimit;
+    const troncato = lim && H.length >= lim ? ` ⚠ Sono caricate solo le ultime ${lim} voci: le più vecchie non sono incluse.` : '';
+    cnt.textContent = (nessunFiltro
+      ? `${rows.length} movimenti — ultimi 7 giorni (nessun filtro attivo).`
+      : `${rows.length} di ${H.length} movimenti caricati.`) + troncato;
+  }
+  const bx = document.getElementById('st-excel');
+  if (bx) bx.disabled = !rows.length;
 
   body.innerHTML = rows.length ? rows.map(h => `
     <tr>
@@ -265,6 +282,59 @@ window.eliminaStorico = async function () {
     showToast('Errore: ' + e.message, 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🗑 ELIMINA DATI STORICI'; }
+  }
+};
+
+// ── EXCEL (righe visibili, cioè già filtrate) ───────────────────────────────
+// La libreria SheetJS si carica solo al primo click (non rallenta l'avvio dell'app).
+function _caricaXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise((ok, ko) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload = () => window.XLSX ? ok(window.XLSX) : ko(new Error('Libreria Excel non disponibile'));
+    sc.onerror = () => ko(new Error('Impossibile caricare la libreria Excel (controlla la connessione)'));
+    document.head.appendChild(sc);
+  });
+}
+
+// Data/ora (ora di Roma) → numero seriale Excel, così la colonna è ordinabile come data
+function _excelData(d) {
+  if (!d) return '';
+  const p = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Rome', hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).formatToParts(d);
+  const g = t => +p.find(x => x.type === t).value;
+  return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second')) / 86400000 + 25569;
+}
+
+window.scaricaStoricoExcel = async function () {
+  const rows = _storicoRows;
+  if (!rows.length) { showToast('Nessun movimento da scaricare.', 'error'); return; }
+  const btn = document.getElementById('st-excel');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Preparazione…'; }
+  try {
+    const XLSX = await _caricaXLSX();
+    const head = ['Data e ora', 'Azione', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Vuoto'];
+    const aoa = [head].concat(rows.map(h => [
+      _excelData(h.ts), h.action || '', h.codice || '', h.elemento || '',
+      h.origine || '', h.destinazione || '', h.userName || h.user || '',
+      h.lineaBlu ? 'Sì' : '', h.vuoto ? 'Sì' : '',
+    ]));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    for (let r = 2; r <= aoa.length; r++) { const c = ws['A' + r]; if (c && c.t === 'n') c.z = 'dd/mm/yyyy hh:mm'; }
+    ws['!cols'] = [{ wch: 17 }, { wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 8 }];
+    ws['!autofilter'] = { ref: 'A1:' + XLSX.utils.encode_cell({ r: aoa.length - 1, c: head.length - 1 }) };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Storico');
+    const oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+    XLSX.writeFile(wb, `Storico_${oggi}.xlsx`);
+    showToast(`File Excel scaricato (${rows.length} movimenti).`, 'success');
+  } catch (e) {
+    showToast('Errore: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = !_storicoRows.length; btn.textContent = '📥 Scarica Excel'; }
   }
 };
 
