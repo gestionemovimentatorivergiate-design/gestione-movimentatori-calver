@@ -20,7 +20,7 @@ import {
 import { showToast } from './shared-utils.js';
 import { initOperativo, renderNuovaMissione, renderMieMissioni } from './modules/operativo.js';
 import { initNavetta, renderInCorso } from './modules/navetta.js';
-import { initAnagrafiche, renderElementi, renderUbicazioni } from './modules/anagrafiche.js';
+import { initAnagrafiche, renderElementi, renderUbicazioni, renderBuildings } from './modules/anagrafiche.js';
 import { initAdmin, renderStorico, renderStatistiche, renderUtenti } from './modules/admin.js';
 
 // ── STATO CONDIVISO ─────────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ const state = {
   missioni: [],     // pieni: magazzino → linea
   rientri: [],      // vuoti: linea → magazzino
   elementi: [],
+  buildings: [],
   ubicazioni: [],
   history: [],
   utenti: [],
@@ -61,7 +62,7 @@ function refreshCurrentPage() {
     case 'InCorso':       renderInCorso();       break;
     case 'Storico':       renderStorico();       break;
     case 'Statistiche':   renderStatistiche();   break;
-    case 'Anagrafiche':   renderElementi(); renderUbicazioni(); break;
+    case 'Anagrafiche':   renderElementi(); renderBuildings(); renderUbicazioni(); break;
     case 'Utenti':        renderUtenti();        break;
   }
 }
@@ -93,6 +94,10 @@ function startListeners() {
   _unsub.push(onSnapshot(query(collection(db, 'elementi'), orderBy('__name__')),
     snap => { state.elementi = snap.docs.map(d => ({ id: d.id, ...d.data() })); refreshCurrentPage(); },
     err => console.error('Errore elementi:', err)));
+
+  _unsub.push(onSnapshot(query(collection(db, 'buildings'), orderBy('__name__')),
+    snap => { state.buildings = snap.docs.map(d => ({ id: d.id, ...d.data() })); refreshCurrentPage(); },
+    err => console.error('Errore buildings:', err)));
 
   _unsub.push(onSnapshot(query(collection(db, 'ubicazioni'), orderBy('__name__')),
     snap => { state.ubicazioni = snap.docs.map(d => ({ id: d.id, ...d.data() })); refreshCurrentPage(); },

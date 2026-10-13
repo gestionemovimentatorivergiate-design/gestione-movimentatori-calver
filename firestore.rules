@@ -27,6 +27,7 @@ service cloud.firestore {
     // Anagrafiche: lette da tutti gli autenticati, scritte solo dall'amministratore
     match /elementi/{id}   { allow read: if signedIn(); allow write: if isAdmin(); }
     match /ubicazioni/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /buildings/{id}  { allow read: if signedIn(); allow write: if isAdmin(); }
 
     // Missioni e rientri: operatività quotidiana di tutti i ruoli autenticati
     match /missioni/{id} { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }

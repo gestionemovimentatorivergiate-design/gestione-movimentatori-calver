@@ -175,7 +175,7 @@
   <!-- ── PAGINA: ANAGRAFICHE (amministratore) ────────────────────────────────── -->
   <div class="page" id="pageAnagrafiche">
     <div class="pageHeader">Anagrafiche</div>
-    <div class="pageSubtitle">Elementi e ubicazioni — modificabili in qualsiasi momento</div>
+    <div class="pageSubtitle">Elementi, building e ubicazioni — modificabili in qualsiasi momento</div>
 
     <div class="card">
       <div class="cardTitle">Elementi</div>
@@ -188,9 +188,21 @@
     </div>
 
     <div class="card">
+      <div class="cardTitle">Building</div>
+      <div class="field" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <input type="text" id="bd-id" placeholder="ID (lettere e numeri, es. B1)" style="flex:1;min-width:130px" maxlength="20" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter')addBuilding()">
+        <input type="text" id="bd-nome" placeholder="Nome" style="flex:2;min-width:130px" onkeydown="if(event.key==='Enter')addBuilding()">
+        <input type="text" id="bd-desc" placeholder="Descrizione" style="flex:2;min-width:130px" onkeydown="if(event.key==='Enter')addBuilding()">
+        <button class="btnGreen btnSmall" onclick="addBuilding()">+ Aggiungi</button>
+      </div>
+      <div id="bd-list"></div>
+    </div>
+
+    <div class="card">
       <div class="cardTitle">Ubicazioni</div>
       <div class="field" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <input type="text" id="ub-nome" placeholder="Nome (es. Scaffale A / Linea 3)" style="flex:2;min-width:140px" onkeydown="if(event.key==='Enter')addUbicazione()">
+        <select id="ub-building" style="flex:1;min-width:140px"><option value="">— building —</option></select>
         <select id="ub-tipo" style="flex:1;min-width:120px">
           <option value="magazzino">Magazzino</option>
           <option value="linea">Linea</option>
