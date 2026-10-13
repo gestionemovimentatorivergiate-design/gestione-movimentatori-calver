@@ -59,10 +59,31 @@ export function renderNuovaMissione() {
         'border:1px solid #2563eb55;border-radius:8px;background:#2563eb12;cursor:pointer;' +
         'font-weight:700;user-select:none';
       wrap.innerHTML = '<input type="checkbox" id="nm-lineablu" style="width:20px;height:20px;margin:0;accent-color:#2563eb;cursor:pointer">' +
-        '<span>🔵 Linea Blu</span>';
+        '<span>🔵 Linea Blu</span>' +
+        '<span id="nm-lineablu-hint" style="font-size:11px;font-weight:500;color:var(--muted);margin-left:auto"></span>';
       btn.parentNode.insertBefore(wrap, btn);
     }
   }
+  orSel.onchange = _aggiornaLineaBlu;
+  _aggiornaLineaBlu();
+}
+
+// Linea Blu: la spunta è attiva solo se l'origine appartiene a questo Building
+const LINEA_BLU_BUILDING = 'B26';
+
+// Abilita/disabilita la spunta in base all'origine selezionata
+function _aggiornaLineaBlu() {
+  const cb = document.getElementById('nm-lineablu');
+  if (!cb) return;
+  const orId = document.getElementById('nm-origine')?.value;
+  const ub = _getState().ubicazioni.find(x => x.id === orId);
+  const ok = !!ub && ub.buildingId === LINEA_BLU_BUILDING;
+  cb.disabled = !ok;
+  if (!ok) cb.checked = false;
+  const wrap = document.getElementById('nm-lineablu-wrap');
+  if (wrap) { wrap.style.opacity = ok ? '1' : '.5'; wrap.style.cursor = ok ? 'pointer' : 'not-allowed'; }
+  const hint = document.getElementById('nm-lineablu-hint');
+  if (hint) hint.textContent = ok ? '' : `Solo per origini del building ${LINEA_BLU_BUILDING}`;
 }
 
 // Badge + stile per le missioni Linea Blu (priorità)
@@ -87,7 +108,9 @@ window.creaMissione = async function () {
   const destinazione = st.ubicazioni.find(x => x.id === deId);
   if (!elemento || !origine || !destinazione) { showToast('Dati non validi, riprova.', 'error'); return; }
 
-  const lineaBlu = !!document.getElementById('nm-lineablu')?.checked;
+  // Linea Blu valida solo se l'origine appartiene al building B26
+  const lineaBlu = !!document.getElementById('nm-lineablu')?.checked
+    && origine.buildingId === LINEA_BLU_BUILDING;
 
   const btn = document.getElementById('nm-btn');
   btn.disabled = true; btn.textContent = '⏳ Creazione…';
@@ -114,6 +137,7 @@ window.creaMissione = async function () {
     document.getElementById('nm-origine').value = '';
     document.getElementById('nm-destinazione').value = '';
     const cb = document.getElementById('nm-lineablu'); if (cb) cb.checked = false;
+    _aggiornaLineaBlu();
   } catch (e) {
     showToast('Errore: ' + e.message, 'error');
   } finally {
