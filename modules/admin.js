@@ -25,26 +25,37 @@ export function renderStorico() {
   if (!body) return;
   const H = _getState().history || [];
 
-  // Popola il select azioni preservando la selezione
-  const selAz = document.getElementById('st-azione');
-  if (selAz) {
-    const cur = selAz.value;
-    const azioni = [...new Set(H.map(h => h.action).filter(Boolean))].sort();
-    selAz.innerHTML = '<option value="">Tutte le azioni</option>' +
-      azioni.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
-    if (azioni.includes(cur)) selAz.value = cur;
-  }
+  // Menu a tendina: riempiti con i valori presenti nello storico, mantenendo la scelta
+  const percorso = h => (h.origine || h.destinazione) ? (h.origine || '?') + ' → ' + (h.destinazione || '?') : '';
+  const utente = h => h.userName || h.user || '';
+  const fill = (id, vals, tutti) => {
+    const sel = document.getElementById(id);
+    if (!sel) return '';
+    const cur = sel.value;
+    const list = [...new Set(vals.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'it', { numeric: true }));
+    sel.innerHTML = `<option value="">${tutti}</option>` + list.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if (list.includes(cur)) sel.value = cur;
+    return sel.value;
+  };
+  const fAz  = fill('st-azione',   H.map(h => h.action), 'Tutte');
+  const fUt  = fill('st-utente',   H.map(utente),        'Tutti');
+  const fPer = fill('st-percorso', H.map(percorso),      'Tutti');
+  const fEl  = fill('st-elemento', H.map(h => h.elemento), 'Tutti');
+  const fData = document.getElementById('st-data')?.value || '';          // aaaa-mm-gg
+  const fId = (document.getElementById('st-id')?.value || '').trim().toLowerCase();
+  const giorno = h => h.ts ? h.ts.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }) : '';
 
-  const q = (document.getElementById('st-cerca')?.value || '').trim().toLowerCase();
-  const fAz = selAz?.value || '';
+  // Tutti i filtri attivi si combinano (AND)
+  const rows = H.filter(h =>
+    (!fAz  || h.action === fAz) &&
+    (!fUt  || utente(h) === fUt) &&
+    (!fPer || percorso(h) === fPer) &&
+    (!fEl  || h.elemento === fEl) &&
+    (!fData || giorno(h) === fData) &&
+    (!fId  || (h.codice || '').toLowerCase().includes(fId)));
 
-  let rows = H;
-  if (fAz) rows = rows.filter(h => h.action === fAz);
-  if (q) rows = rows.filter(h =>
-    (h.codice || '').toLowerCase().includes(q) ||
-    (h.elemento || '').toLowerCase().includes(q) ||
-    (h.origine || '').toLowerCase().includes(q) ||
-    (h.destinazione || '').toLowerCase().includes(q));
+  const cnt = document.getElementById('st-count');
+  if (cnt) cnt.textContent = `${rows.length} di ${H.length} movimenti caricati`;
 
   body.innerHTML = rows.length ? rows.map(h => `
     <tr>
@@ -217,6 +228,12 @@ window.addUser = async function () {
 
 // Esposta su window: i filtri dello storico la richiamano da onclick/oninput inline
 window.renderStorico = renderStorico;
+window.resetFiltriStorico = function () {
+  ['st-data', 'st-id', 'st-utente', 'st-percorso', 'st-elemento', 'st-azione'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderStorico();
+};
 
 // ── Helper modale ────────────────────────────────────────────────────────────
 window.openModal = function (id) {
