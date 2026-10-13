@@ -2,14 +2,19 @@
 // CRUD di Elementi e Ubicazioni. Editabili in qualsiasi momento.
 //
 // elementi/{id}    : { codice, descrizione, attivo, createdAt }
-// ubicazioni/{id}  : { nome, tipo: 'magazzino'|'linea', attivo, createdAt }
+// buildings/{ID}   : { nome, descrizione, attivo, createdAt }
+//                    l'ID del documento è l'ID scelto dall'admin (lettere e numeri,
+//                    maiuscolo, univoco, NON modificabile dopo la creazione)
+// ubicazioni/{id}  : { nome, tipo: 'magazzino'|'linea', buildingId, attivo, createdAt }
+//                    buildingId → buildings/{ID}; il nome del building si legge
+//                    sempre da buildings (non è copiato), quindi resta aggiornato.
 //
 // Nota: missioni e rientri referenziano gli ID; nomi/codici sono anche
 // denormalizzati sulle missioni al momento della creazione, quindi rinominare
 // un'anagrafica non rompe le missioni già create.
 
 import {
-  addDoc, collection, doc, updateDoc, deleteDoc, serverTimestamp
+  addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { showToast, esc } from '../shared-utils.js';
 
@@ -95,21 +100,121 @@ window.deleteElemento = async function (id, codice) {
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
 
+// ── BUILDINGS ───────────────────────────────────────────────────────────────
+const _BID_RE = /^[A-Za-z0-9]+$/;
+
+export function renderBuildings() {
+  const el = document.getElementById('bd-list');
+  if (!el) return;
+  const list = [..._getState().buildings]
+    .sort((a, b) => String(a.id).localeCompare(String(b.id), 'it', { numeric: true }));
+  if (!list.length) { el.innerHTML = '<div class="emptyState">Nessun building. Aggiungine uno sopra.</div>'; return; }
+  el.innerHTML = list.map(b => `
+    <div class="rowItem ${b.attivo === false ? 'off' : ''}">
+      <div class="rowMain">
+        <div class="rowTitle"><span class="mono">${esc(b.id)}</span> · ${esc(b.nome)} ${b.attivo === false ? '<span class="pill off">disattivato</span>' : ''}</div>
+        ${b.descrizione ? `<div class="rowSub">${esc(b.descrizione)}</div>` : ''}
+      </div>
+      <button class="btnIcon" title="Modifica" onclick="renameBuilding('${esc(b.id)}')">✏️</button>
+      <button class="btnIcon" title="${b.attivo === false ? 'Riattiva' : 'Disattiva'}" onclick="toggleBuilding('${esc(b.id)}',${b.attivo === false})">${b.attivo === false ? '↩️' : '🚫'}</button>
+      <button class="btnIcon" title="Elimina" onclick="deleteBuilding('${esc(b.id)}')">🗑</button>
+    </div>`).join('');
+}
+
+// Menu "Building" del form Ubicazioni: solo building attivi; mantiene la selezione
+function _fillBuildingSelect() {
+  const sel = document.getElementById('ub-building');
+  if (!sel) return;
+  const cur = sel.value;
+  const attivi = [..._getState().buildings]
+    .filter(b => b.attivo !== false)
+    .sort((a, b) => String(a.id).localeCompare(String(b.id), 'it', { numeric: true }));
+  sel.innerHTML = '<option value="">— building —</option>' +
+    attivi.map(b => `<option value="${esc(b.id)}">${esc(b.id)} · ${esc(b.nome)}</option>`).join('');
+  sel.value = attivi.some(b => b.id === cur) ? cur : '';
+}
+
+window.addBuilding = async function () {
+  if (!_requireAdmin()) return;
+  const idEl = document.getElementById('bd-id');
+  const nomeEl = document.getElementById('bd-nome');
+  const descEl = document.getElementById('bd-desc');
+  const id = (idEl.value || '').trim().toUpperCase();
+  const nome = (nomeEl.value || '').trim();
+  const descrizione = (descEl.value || '').trim();
+  if (!id) { showToast('Inserisci l\'ID del building.', 'error'); return; }
+  if (!_BID_RE.test(id)) { showToast('ID: solo lettere e numeri, senza spazi o simboli.', 'error'); return; }
+  if (!nome) { showToast('Inserisci il nome del building.', 'error'); return; }
+  try {
+    const ref = doc(window.db, 'buildings', id);
+    if ((await getDoc(ref)).exists()) { showToast('ID building già esistente.', 'error'); return; }
+    await setDoc(ref, { nome, descrizione, attivo: true, createdAt: serverTimestamp() });
+    idEl.value = ''; nomeEl.value = ''; descEl.value = '';
+    showToast('Building aggiunto.', 'success');
+  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+};
+
+// L'ID non è modificabile: si cambiano solo nome e descrizione
+window.renameBuilding = async function (id) {
+  if (!_requireAdmin()) return;
+  const b = _getState().buildings.find(x => x.id === id);
+  if (!b) return;
+  const nome = prompt(`Nome building (ID ${b.id}, non modificabile):`, b.nome);
+  if (nome === null || !nome.trim()) return;
+  const descrizione = prompt('Descrizione (facoltativa):', b.descrizione || '');
+  if (descrizione === null) return;
+  try {
+    await updateDoc(doc(window.db, 'buildings', id), { nome: nome.trim(), descrizione: descrizione.trim() });
+    showToast('Building aggiornato.', 'success');
+  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+};
+
+window.toggleBuilding = async function (id, attiva) {
+  if (!_requireAdmin()) return;
+  try {
+    await updateDoc(doc(window.db, 'buildings', id), { attivo: !!attiva });
+    showToast(attiva ? 'Building riattivato.' : 'Building disattivato.', 'success');
+  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+};
+
+window.deleteBuilding = async function (id) {
+  if (!_requireAdmin()) return;
+  const b = _getState().buildings.find(x => x.id === id);
+  if (!b) return;
+  const usate = _getState().ubicazioni.filter(u => u.buildingId === id).length;
+  if (usate) { showToast(`Building usato da ${usate} ubicazioni: disattivalo invece di eliminarlo.`, 'error'); return; }
+  if (!confirm(`Eliminare il building "${b.id} · ${b.nome}"?`)) return;
+  try {
+    await deleteDoc(doc(window.db, 'buildings', id));
+    showToast('Building eliminato.', 'success');
+  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+};
+
 // ── UBICAZIONI ──────────────────────────────────────────────────────────────
 export function renderUbicazioni() {
+  _fillBuildingSelect();
   const el = document.getElementById('ub-list');
   if (!el) return;
   const list = _getState().ubicazioni;
   if (!list.length) { el.innerHTML = '<div class="emptyState">Nessuna ubicazione. Aggiungine una sopra.</div>'; return; }
-  el.innerHTML = list.map(u => `
+  const bMap = {};
+  _getState().buildings.forEach(b => { bMap[b.id] = b; });
+  el.innerHTML = list.map(u => {
+    const b = u.buildingId ? bMap[u.buildingId] : null;
+    const bTxt = !u.buildingId ? '— nessun building'
+      : b ? `Building ${esc(b.id)} · ${esc(b.nome)}`
+      : `Building ${esc(u.buildingId)} (non trovato)`;
+    return `
     <div class="rowItem ${u.attivo === false ? 'off' : ''}">
       <div class="rowMain">
         <div class="rowTitle">${esc(u.nome)} <span class="pill ${u.tipo}">${u.tipo === 'magazzino' ? 'Magazzino' : 'Linea'}</span> ${u.attivo === false ? '<span class="pill off">disattivata</span>' : ''}</div>
+        <div class="rowSub">🏢 ${bTxt}</div>
       </div>
       <button class="btnIcon" title="Rinomina" onclick="renameUbicazione('${u.id}')">✏️</button>
       <button class="btnIcon" title="${u.attivo === false ? 'Riattiva' : 'Disattiva'}" onclick="toggleUbicazione('${u.id}',${u.attivo === false})">${u.attivo === false ? '↩️' : '🚫'}</button>
       <button class="btnIcon" title="Elimina" onclick="deleteUbicazione('${u.id}','${esc(u.nome)}')">🗑</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 window.addUbicazione = async function () {
@@ -118,12 +223,15 @@ window.addUbicazione = async function () {
   const tipoEl = document.getElementById('ub-tipo');
   const nome = (nomeEl.value || '').trim();
   const tipo = tipoEl.value === 'linea' ? 'linea' : 'magazzino';
+  const buildingId = (document.getElementById('ub-building')?.value || '').trim();
   if (!nome) { showToast('Inserisci il nome ubicazione.', 'error'); return; }
+  if (!buildingId) { showToast('Seleziona il Building dell\'ubicazione.', 'error'); return; }
+  if (!_getState().buildings.some(b => b.id === buildingId)) { showToast('Building non valido.', 'error'); return; }
   if (_getState().ubicazioni.some(u => (u.nome || '').toLowerCase() === nome.toLowerCase())) {
     showToast('Ubicazione già esistente.', 'error'); return;
   }
   try {
-    await addDoc(collection(window.db, 'ubicazioni'), { nome, tipo, attivo: true, createdAt: serverTimestamp() });
+    await addDoc(collection(window.db, 'ubicazioni'), { nome, tipo, buildingId, attivo: true, createdAt: serverTimestamp() });
     nomeEl.value = '';
     showToast('Ubicazione aggiunta.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
@@ -136,8 +244,13 @@ window.renameUbicazione = async function (id) {
   const nome = prompt('Nome ubicazione:', u.nome);
   if (nome === null || !nome.trim()) return;
   const tipo = confirm('OK = Magazzino · Annulla = Linea\n(attuale: ' + (u.tipo === 'magazzino' ? 'Magazzino' : 'Linea') + ')') ? 'magazzino' : 'linea';
+  const elenco = _getState().buildings.map(b => `${b.id} = ${b.nome}`).join('\n');
+  const bIn = prompt('ID Building:\n' + elenco, u.buildingId || '');
+  if (bIn === null) return;
+  const buildingId = bIn.trim().toUpperCase();
+  if (!_getState().buildings.some(b => b.id === buildingId)) { showToast('Building non valido: usa un ID esistente.', 'error'); return; }
   try {
-    await updateDoc(doc(window.db, 'ubicazioni', id), { nome: nome.trim(), tipo });
+    await updateDoc(doc(window.db, 'ubicazioni', id), { nome: nome.trim(), tipo, buildingId });
     showToast('Ubicazione aggiornata.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };

@@ -7,13 +7,14 @@
 // missioni/{id} : elemento + origine/destinazione + stato
 //    stato: richiesta → in_transito → consegnata   (+ annullata da 'richiesta')
 //    vuotoId: riferimento al rientro generato (null finché non dichiarato)
+//    lineaBlu: true se la missione è prioritaria (spunta "Linea Blu"); assente = false
 // rientri/{id}  : il vuoto, collegato da missioneId ↔ missioni.vuotoId
 //    stato: da_rientrare → in_transito → rientrato  (+ annullato da 'da_rientrare')
 
 import {
   collection, doc, addDoc, updateDoc, writeBatch, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { showToast, esc, fmtDate } from '../shared-utils.js';
+import { showToast, esc, fmtDate, tsVal } from '../shared-utils.js';
 
 let _getState, _getUser;
 
@@ -46,7 +47,32 @@ export function renderNuovaMissione() {
 
   // Ripristina selezione precedente se ancora valida
   elSel.value = vEl; orSel.value = vOr; deSel.value = vDe;
+
+  // Spunta "Linea Blu": creata una sola volta, subito sopra il pulsante di creazione.
+  // Non viene ricreata ai refresh, quindi mantiene lo stato selezionato.
+  if (!document.getElementById('nm-lineablu')) {
+    const btn = document.getElementById('nm-btn');
+    if (btn && btn.parentNode) {
+      const wrap = document.createElement('label');
+      wrap.id = 'nm-lineablu-wrap';
+      wrap.style.cssText = 'display:flex;align-items:center;gap:10px;margin:12px 0;padding:10px 12px;' +
+        'border:1px solid #2563eb55;border-radius:8px;background:#2563eb12;cursor:pointer;' +
+        'font-weight:700;user-select:none';
+      wrap.innerHTML = '<input type="checkbox" id="nm-lineablu" style="width:20px;height:20px;margin:0;accent-color:#2563eb;cursor:pointer">' +
+        '<span>🔵 Linea Blu</span>';
+      btn.parentNode.insertBefore(wrap, btn);
+    }
+  }
 }
+
+// Badge + stile per le missioni Linea Blu (priorità)
+const BLU_BORDER = 'border-left:4px solid #2563eb;';
+function _badgeBlu(m) {
+  return m.lineaBlu
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#2563eb;color:#fff;letter-spacing:.3px">🔵 LINEA BLU</span>'
+    : '';
+}
+function _styleBlu(m) { return m.lineaBlu ? ` style="${BLU_BORDER}"` : ''; }
 
 window.creaMissione = async function () {
   const u = _getUser();
@@ -61,6 +87,8 @@ window.creaMissione = async function () {
   const destinazione = st.ubicazioni.find(x => x.id === deId);
   if (!elemento || !origine || !destinazione) { showToast('Dati non validi, riprova.', 'error'); return; }
 
+  const lineaBlu = !!document.getElementById('nm-lineablu')?.checked;
+
   const btn = document.getElementById('nm-btn');
   btn.disabled = true; btn.textContent = '⏳ Creazione…';
   try {
@@ -68,6 +96,7 @@ window.creaMissione = async function () {
       elementoId: elId, elementoCodice: elemento.codice,
       origineId: orId, origineNome: origine.nome,
       destinazioneId: deId, destinazioneNome: destinazione.nome,
+      lineaBlu,
       stato: 'richiesta',
       navettaId: null, navettaNome: null,
       ownerUid: u.uid, ownerNome: u.name || u.email,
@@ -77,12 +106,14 @@ window.creaMissione = async function () {
     await window.logHistory({
       action: 'Missione creata', elemento: elemento.codice,
       origine: origine.nome, destinazione: destinazione.nome,
+      lineaBlu,
     });
-    showToast(`Missione creata: ${elemento.codice} → ${destinazione.nome}`, 'success');
+    showToast(`Missione${lineaBlu ? ' LINEA BLU' : ''} creata: ${elemento.codice} → ${destinazione.nome}`, 'success');
     // Reset selezioni
     document.getElementById('nm-elemento').value = '';
     document.getElementById('nm-origine').value = '';
     document.getElementById('nm-destinazione').value = '';
+    const cb = document.getElementById('nm-lineablu'); if (cb) cb.checked = false;
   } catch (e) {
     showToast('Errore: ' + e.message, 'error');
   } finally {
@@ -103,7 +134,10 @@ export function renderMieMissioni() {
     .sort((a, b) => (a.consegnataAt?.toDate?.() || 0) - (b.consegnataAt?.toDate?.() || 0));
 
   // 2) Mie missioni ancora in attesa (annullabili)
-  const mieRichieste = st.missioni.filter(m => m.stato === 'richiesta' && m.ownerUid === u.uid);
+  // Linea Blu in alto, poi per anzianità (la più vecchia prima)
+  const mieRichieste = st.missioni
+    .filter(m => m.stato === 'richiesta' && m.ownerUid === u.uid)
+    .sort((a, b) => (b.lineaBlu ? 1 : 0) - (a.lineaBlu ? 1 : 0) || tsVal(a.createdAt) - tsVal(b.createdAt));
 
   // 3) Miei rientri ancora in attesa (annullabili)
   const mieiRientri = st.rientri.filter(r => r.stato === 'da_rientrare' && r.ownerUid === u.uid);
@@ -129,9 +163,10 @@ export function renderMieMissioni() {
 
 function _cardDaVuoto(m) {
   return `
-    <div class="mCard pieno">
+    <div class="mCard pieno"${_styleBlu(m)}>
       <div class="mHead">
         <span class="mElemento">${esc(m.elementoCodice)}</span>
+        ${_badgeBlu(m)}
         <span class="mStatoBadge consegnata">Consegnata</span>
       </div>
       <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
@@ -144,9 +179,10 @@ function _cardDaVuoto(m) {
 
 function _cardMissioneAttesa(m) {
   return `
-    <div class="mCard pieno">
+    <div class="mCard pieno"${_styleBlu(m)}>
       <div class="mHead">
         <span class="mElemento">${esc(m.elementoCodice)}</span>
+        ${_badgeBlu(m)}
         <span class="mStatoBadge richiesta">In attesa</span>
       </div>
       <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>

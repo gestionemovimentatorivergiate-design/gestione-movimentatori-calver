@@ -45,10 +45,12 @@ export function renderInCorso() {
   const tkRient = st.rientri.filter(r => r.stato === 'in_transito' && (isAdmin || r.navettaId === u.uid))
     .map(r => ({ ...r, _kind: 'rientro', _avail: false }));
 
-  // Un'unica lista ordinata per anzianità: prendere un elemento non lo sposta
-  // di posizione (la card "rimane" dov'era).
+  // Un'unica lista: prima le missioni LINEA BLU, poi tutto il resto; a parità
+  // ordinata per anzianità. Prendere un elemento non lo sposta di posizione
+  // (la card "rimane" dov'era), perché lineaBlu e createdAt non cambiano.
   const lista = avMiss.concat(avRient, tkMiss, tkRient)
-    .sort((a, b) => tsVal(a.createdAt) - tsVal(b.createdAt));
+    .sort((a, b) => (b.lineaBlu ? 1 : 0) - (a.lineaBlu ? 1 : 0)
+                 || tsVal(a.createdAt) - tsVal(b.createdAt));
 
   // Statistiche
   const statsEl = document.getElementById('incorso-stats');
@@ -88,10 +90,16 @@ function _card(item) {
     actionBtn = `<button class="btnGreen" onclick="${fn}('${item.id}')">${label}</button>`;
   }
 
+  const blu = isPieno && item.lineaBlu;
+  const badgeBlu = blu
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#2563eb;color:#fff;letter-spacing:.3px">🔵 LINEA BLU</span>'
+    : '';
+
   return `
-    <div class="mCard ${isPieno ? 'pieno' : 'vuoto'}">
+    <div class="mCard ${isPieno ? 'pieno' : 'vuoto'}"${blu ? ' style="border-left:4px solid #2563eb;"' : ''}>
       <div class="mHead">
         <span class="mElemento">${esc(item.elementoCodice)}</span>
+        ${badgeBlu}
         ${tipoBadge}
         ${statoBadge}
       </div>
