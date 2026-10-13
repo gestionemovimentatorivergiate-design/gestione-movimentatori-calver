@@ -154,6 +154,7 @@ export function renderMieMissioni() {
     .filter(m => m.stato === 'richiesta' && m.ownerUid === u.uid)
     .sort((a, b) => (b.lineaBlu ? 1 : 0) - (a.lineaBlu ? 1 : 0) || tsVal(a.createdAt) - tsVal(b.createdAt));
 
+  let html = '';
   html += `<div class="groupTitle">Mie missioni in attesa (${mieRichieste.length})</div>`;
   html += mieRichieste.length
     ? mieRichieste.map(_cardMissioneAttesa).join('')
