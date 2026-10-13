@@ -2,12 +2,15 @@
 // CRUD di Elementi e Ubicazioni. Editabili in qualsiasi momento.
 //
 // elementi/{id}    : { codice, descrizione, attivo, createdAt }
-// buildings/{ID}   : { nome, descrizione, attivo, createdAt }
-//                    l'ID del documento è l'ID scelto dall'admin (lettere e numeri,
-//                    maiuscolo, univoco, NON modificabile dopo la creazione)
+// BUILDING         : salvati nella collezione ubicazioni/{ID} con tipo: 'building'
+//                    { nome, descrizione, tipo:'building', attivo, createdAt }
+//                    (così usano le regole già esistenti di 'ubicazioni').
+//                    L'ID del documento è l'ID scelto dall'admin (lettere e numeri,
+//                    maiuscolo, univoco, NON modificabile dopo la creazione).
+//                    app.js li separa dalle ubicazioni vere in state.buildings.
 // ubicazioni/{id}  : { nome, tipo: 'magazzino'|'linea', buildingId, attivo, createdAt }
-//                    buildingId → buildings/{ID}; il nome del building si legge
-//                    sempre da buildings (non è copiato), quindi resta aggiornato.
+//                    buildingId → ID del Building; il nome si legge sempre da
+//                    state.buildings (non è copiato), quindi resta aggiornato.
 //
 // Nota: missioni e rientri referenziano gli ID; nomi/codici sono anche
 // denormalizzati sulle missioni al momento della creazione, quindi rinominare
@@ -146,9 +149,9 @@ window.addBuilding = async function () {
   if (!_BID_RE.test(id)) { showToast('ID: solo lettere e numeri, senza spazi o simboli.', 'error'); return; }
   if (!nome) { showToast('Inserisci il nome del building.', 'error'); return; }
   try {
-    const ref = doc(window.db, 'buildings', id);
+    const ref = doc(window.db, 'ubicazioni', id);
     if ((await getDoc(ref)).exists()) { showToast('ID building già esistente.', 'error'); return; }
-    await setDoc(ref, { nome, descrizione, attivo: true, createdAt: serverTimestamp() });
+    await setDoc(ref, { nome, descrizione, tipo: 'building', attivo: true, createdAt: serverTimestamp() });
     idEl.value = ''; nomeEl.value = ''; descEl.value = '';
     showToast('Building aggiunto.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
@@ -164,7 +167,7 @@ window.renameBuilding = async function (id) {
   const descrizione = prompt('Descrizione (facoltativa):', b.descrizione || '');
   if (descrizione === null) return;
   try {
-    await updateDoc(doc(window.db, 'buildings', id), { nome: nome.trim(), descrizione: descrizione.trim() });
+    await updateDoc(doc(window.db, 'ubicazioni', id), { nome: nome.trim(), descrizione: descrizione.trim() });
     showToast('Building aggiornato.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
@@ -172,7 +175,7 @@ window.renameBuilding = async function (id) {
 window.toggleBuilding = async function (id, attiva) {
   if (!_requireAdmin()) return;
   try {
-    await updateDoc(doc(window.db, 'buildings', id), { attivo: !!attiva });
+    await updateDoc(doc(window.db, 'ubicazioni', id), { attivo: !!attiva });
     showToast(attiva ? 'Building riattivato.' : 'Building disattivato.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
@@ -185,7 +188,7 @@ window.deleteBuilding = async function (id) {
   if (usate) { showToast(`Building usato da ${usate} ubicazioni: disattivalo invece di eliminarlo.`, 'error'); return; }
   if (!confirm(`Eliminare il building "${b.id} · ${b.nome}"?`)) return;
   try {
-    await deleteDoc(doc(window.db, 'buildings', id));
+    await deleteDoc(doc(window.db, 'ubicazioni', id));
     showToast('Building eliminato.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
