@@ -25,12 +25,15 @@ import { initAdmin, renderStorico, renderStatistiche, renderUtenti } from './mod
 
 // ── STATO CONDIVISO ─────────────────────────────────────────────────────────
 let currentUser = null;
+// Quante voci di storico vengono caricate (le più recenti). Usato anche da admin.js.
+const HISTORY_LIMIT = 1000;
 const state = {
   missioni: [],
   elementi: [],
   buildings: [],
   ubicazioni: [],
   history: [],
+  historyLimit: HISTORY_LIMIT,
   utenti: [],
 };
 const getState = () => state;
@@ -103,7 +106,7 @@ function startListeners() {
 
   // Storico e utenti solo per chi ne ha bisogno (amministrativo/amministratore)
   if (isAmm) {
-    _unsub.push(onSnapshot(query(collection(db, 'history'), orderBy('ts', 'desc'), limit(300)),
+    _unsub.push(onSnapshot(query(collection(db, 'history'), orderBy('ts', 'desc'), limit(HISTORY_LIMIT)),
       snap => { state.history = snap.docs.map(d => ({ id: d.id, ...d.data(), ts: d.data().ts?.toDate() })); refreshCurrentPage(); },
       err => console.error('Errore history:', err)));
   }

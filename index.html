@@ -155,8 +155,9 @@
       <button class="btnGray btnSmall" onclick="resetFiltriStorico()">✕ Azzera filtri</button>
     </div>
     <div class="pageSubtitle" id="st-count" style="margin-top:-4px"></div>
-    <!-- Visibile solo all'amministratore (nascosto/mostrato da admin.js) -->
-    <div style="margin-bottom:12px">
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btnGreen btnSmall" id="st-excel" onclick="scaricaStoricoExcel()">📥 Scarica Excel</button>
+      <!-- "Elimina dati storici": visibile solo all'amministratore (mostrato/nascosto da admin.js) -->
       <button class="btnGray btnSmall" id="st-reset" style="display:none;color:#dc2626;border:1.5px solid #dc2626" onclick="eliminaStorico()">🗑 ELIMINA DATI STORICI</button>
     </div>
     <div class="tableWrap">
