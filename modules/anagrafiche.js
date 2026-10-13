@@ -8,7 +8,7 @@
 //                    L'ID del documento è l'ID scelto dall'admin (lettere e numeri,
 //                    maiuscolo, univoco, NON modificabile dopo la creazione).
 //                    app.js li separa dalle ubicazioni vere in state.buildings.
-// ubicazioni/{id}  : { nome, tipo: 'magazzino'|'linea', buildingId, attivo, createdAt }
+// ubicazioni/{id}  : { nome, buildingId, attivo, createdAt }  (nessun tipo: origine e destinazione sono libere)
 //                    buildingId → ID del Building; il nome si legge sempre da
 //                    state.buildings (non è copiato), quindi resta aggiornato.
 //
@@ -210,7 +210,7 @@ export function renderUbicazioni() {
     return `
     <div class="rowItem ${u.attivo === false ? 'off' : ''}">
       <div class="rowMain">
-        <div class="rowTitle">${esc(u.nome)} <span class="pill ${u.tipo}">${u.tipo === 'magazzino' ? 'Magazzino' : 'Linea'}</span> ${u.attivo === false ? '<span class="pill off">disattivata</span>' : ''}</div>
+        <div class="rowTitle">${esc(u.nome)} ${u.attivo === false ? '<span class="pill off">disattivata</span>' : ''}</div>
         <div class="rowSub">🏢 ${bTxt}</div>
       </div>
       <button class="btnIcon" title="Rinomina" onclick="renameUbicazione('${u.id}')">✏️</button>
@@ -223,9 +223,7 @@ export function renderUbicazioni() {
 window.addUbicazione = async function () {
   if (!_requireAdmin()) return;
   const nomeEl = document.getElementById('ub-nome');
-  const tipoEl = document.getElementById('ub-tipo');
   const nome = (nomeEl.value || '').trim();
-  const tipo = tipoEl.value === 'linea' ? 'linea' : 'magazzino';
   const buildingId = (document.getElementById('ub-building')?.value || '').trim();
   if (!nome) { showToast('Inserisci il nome ubicazione.', 'error'); return; }
   if (!buildingId) { showToast('Seleziona il Building dell\'ubicazione.', 'error'); return; }
@@ -234,7 +232,7 @@ window.addUbicazione = async function () {
     showToast('Ubicazione già esistente.', 'error'); return;
   }
   try {
-    await addDoc(collection(window.db, 'ubicazioni'), { nome, tipo, buildingId, attivo: true, createdAt: serverTimestamp() });
+    await addDoc(collection(window.db, 'ubicazioni'), { nome, buildingId, attivo: true, createdAt: serverTimestamp() });
     nomeEl.value = '';
     showToast('Ubicazione aggiunta.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
@@ -246,14 +244,13 @@ window.renameUbicazione = async function (id) {
   if (!u) return;
   const nome = prompt('Nome ubicazione:', u.nome);
   if (nome === null || !nome.trim()) return;
-  const tipo = confirm('OK = Magazzino · Annulla = Linea\n(attuale: ' + (u.tipo === 'magazzino' ? 'Magazzino' : 'Linea') + ')') ? 'magazzino' : 'linea';
   const elenco = _getState().buildings.map(b => `${b.id} = ${b.nome}`).join('\n');
   const bIn = prompt('ID Building:\n' + elenco, u.buildingId || '');
   if (bIn === null) return;
   const buildingId = bIn.trim().toUpperCase();
   if (!_getState().buildings.some(b => b.id === buildingId)) { showToast('Building non valido: usa un ID esistente.', 'error'); return; }
   try {
-    await updateDoc(doc(window.db, 'ubicazioni', id), { nome: nome.trim(), tipo, buildingId });
+    await updateDoc(doc(window.db, 'ubicazioni', id), { nome: nome.trim(), buildingId });
     showToast('Ubicazione aggiornata.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };

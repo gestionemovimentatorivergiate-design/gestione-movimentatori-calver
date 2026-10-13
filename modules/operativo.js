@@ -35,15 +35,16 @@ export function renderNuovaMissione() {
   const vEl = keep(elSel), vOr = keep(orSel), vDe = keep(deSel);
 
   const elementi = st.elementi.filter(e => e.attivo !== false);
-  const magazzini = st.ubicazioni.filter(u => u.attivo !== false && u.tipo === 'magazzino');
-  const linee     = st.ubicazioni.filter(u => u.attivo !== false && u.tipo === 'linea');
+  // Origine e destinazione: qualsiasi ubicazione attiva (nessun vincolo di tipo)
+  const ubicazioni = st.ubicazioni.filter(u => u.attivo !== false)
+    .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
 
   elSel.innerHTML = '<option value="">— seleziona —</option>' +
-    elementi.map(e => `<option value="${e.id}">${esc(e.codice)}${e.descrizione ? ' · ' + esc(e.descrizione) : ''}</option>`).join('');
+    elementi.map(e => `<option value="${e.id}">${esc(e.codice)}</option>`).join('');
   orSel.innerHTML = '<option value="">— seleziona —</option>' +
-    magazzini.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
+    ubicazioni.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
   deSel.innerHTML = '<option value="">— seleziona —</option>' +
-    linee.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
+    ubicazioni.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
 
   // Ripristina selezione precedente se ancora valida
   elSel.value = vEl; orSel.value = vOr; deSel.value = vDe;
