@@ -241,7 +241,7 @@ function _cardMissioneAttesa(m) {
   return `
     <div class="mCard pieno"${_styleBlu(m)}>
       <div class="mHead">
-        ${m.codice ? `<span class="mono" style="font-size:12px;font-weight:700;color:var(--muted)">${esc(m.codice)}</span>` : ''}
+        ${m.codice ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;letter-spacing:.5px;color:var(--muted)">${esc(m.codice)}</span>` : ''}
         <span class="mElemento">${esc(m.elementoCodice)}</span>
         ${_badgeBlu(m)}
         ${_badgeVuoto(m)}

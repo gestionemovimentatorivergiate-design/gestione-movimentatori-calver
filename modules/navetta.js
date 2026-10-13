@@ -86,7 +86,7 @@ function _card(item) {
   return `
     <div class="mCard pieno"${blu ? ' style="border-left:4px solid #2563eb;"' : ''}>
       <div class="mHead">
-        ${item.codice ? `<span class="mono" style="font-size:12px;font-weight:700;color:var(--muted)">${esc(item.codice)}</span>` : ''}
+        ${item.codice ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;letter-spacing:.5px;color:var(--muted)">${esc(item.codice)}</span>` : ''}
         <span class="mElemento">${esc(item.elementoCodice)}</span>
         ${badgeBlu}
         ${badgeVuoto}
