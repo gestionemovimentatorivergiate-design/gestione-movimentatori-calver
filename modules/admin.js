@@ -286,16 +286,84 @@ window.eliminaStorico = async function () {
 };
 
 // ── EXCEL (righe visibili, cioè già filtrate) ───────────────────────────────
-// La libreria SheetJS si carica solo al primo click (non rallenta l'avvio dell'app).
-function _caricaXLSX() {
-  if (window.XLSX) return Promise.resolve(window.XLSX);
-  return new Promise((ok, ko) => {
-    const sc = document.createElement('script');
-    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    sc.onload = () => window.XLSX ? ok(window.XLSX) : ko(new Error('Libreria Excel non disponibile'));
-    sc.onerror = () => ko(new Error('Impossibile caricare la libreria Excel (controlla la connessione)'));
-    document.head.appendChild(sc);
+// Il file .xlsx viene costruito direttamente qui, senza librerie esterne né
+// connessione a internet: un .xlsx è uno zip di piccoli file XML.
+
+// CRC32 (richiesto dal formato zip)
+const _CRC = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function _crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = _CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+
+// Zip senza compressione ("store"): files = [{ name, data: Uint8Array }]
+function _zip(files) {
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let off = 0;
+  const u16 = n => [n & 255, (n >>> 8) & 255];
+  const u32 = n => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+  for (const f of files) {
+    const name = enc.encode(f.name), crc = _crc32(f.data), size = f.data.length;
+    const lh = Uint8Array.from([0x50, 0x4B, 3, 4, 20, 0, 0, 0, 0, 0, 0, 0, 0x21, 0,
+      ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), 0, 0]);
+    parts.push(lh, name, f.data);
+    central.push(Uint8Array.from([0x50, 0x4B, 1, 2, 20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0x21, 0,
+      ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      ...u32(off)]), name);
+    off += lh.length + name.length + size;
+  }
+  const cdSize = central.reduce((a, b) => a + b.length, 0);
+  const eocd = Uint8Array.from([0x50, 0x4B, 5, 6, 0, 0, 0, 0, ...u16(files.length), ...u16(files.length),
+    ...u32(cdSize), ...u32(off), 0, 0]);
+  const all = [...parts, ...central, eocd];
+  const out = new Uint8Array(all.reduce((a, b) => a + b.length, 0));
+  let pos = 0; for (const a of all) { out.set(a, pos); pos += a.length; }
+  return out;
+}
+
+const _xe = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+const _col = i => String.fromCharCode(65 + i);   // A..I (servono 9 colonne)
+
+// Costruisce il file .xlsx: head = intestazioni, rows = array di array
+// (numero = numero/data seriale; stringa = testo). La colonna 0 è una data/ora.
+function _xlsxBytes(head, rows, larghezze) {
+  const enc = new TextEncoder();
+  const cell = (v, r, c, st) => {
+    const ref = _col(c) + r;
+    if (v === '' || v == null) return '';
+    if (typeof v === 'number') return `<c r="${ref}"${st ? ` s="${st}"` : ''}><v>${v}</v></c>`;
+    return `<c r="${ref}"${st ? ` s="${st}"` : ''} t="inlineStr"><is><t>${_xe(v)}</t></is></c>`;
+  };
+  let sd = `<row r="1">${head.map((h, c) => cell(h, 1, c, 2)).join('')}</row>`;
+  rows.forEach((row, i) => {
+    sd += `<row r="${i + 2}">${row.map((v, c) => cell(v, i + 2, c, c === 0 && typeof v === 'number' ? 1 : 0)).join('')}</row>`;
   });
+  const NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+  const HD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const sheet = `${HD}<worksheet ${NS}><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` +
+    `<cols>${larghezze.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>` +
+    `<sheetData>${sd}</sheetData><autoFilter ref="A1:${_col(head.length - 1)}${rows.length + 1}"/></worksheet>`;
+  const styles = `${HD}<styleSheet ${NS}><numFmts count="1"><numFmt numFmtId="164" formatCode="dd/mm/yyyy\\ hh:mm"/></numFmts>` +
+    `<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>` +
+    `<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>` +
+    `<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>` +
+    `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
+    `<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+    `<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>` +
+    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>` +
+    `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const T = (name, txt) => ({ name, data: enc.encode(txt) });
+  return _zip([
+    T('[Content_Types].xml', `${HD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`),
+    T('_rels/.rels', `${HD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`),
+    T('xl/workbook.xml', `${HD}<workbook ${NS} xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Storico" sheetId="1" r:id="rId1"/></sheets></workbook>`),
+    T('xl/_rels/workbook.xml.rels', `${HD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`),
+    T('xl/styles.xml', styles),
+    T('xl/worksheets/sheet1.xml', sheet),
+  ]);
 }
 
 // Data/ora (ora di Roma) → numero seriale Excel, così la colonna è ordinabile come data
@@ -309,32 +377,27 @@ function _excelData(d) {
   return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second')) / 86400000 + 25569;
 }
 
-window.scaricaStoricoExcel = async function () {
+window.scaricaStoricoExcel = function () {
   const rows = _storicoRows;
   if (!rows.length) { showToast('Nessun movimento da scaricare.', 'error'); return; }
-  const btn = document.getElementById('st-excel');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Preparazione…'; }
   try {
-    const XLSX = await _caricaXLSX();
     const head = ['Data e ora', 'Azione', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Vuoto'];
-    const aoa = [head].concat(rows.map(h => [
+    const dati = rows.map(h => [
       _excelData(h.ts), h.action || '', h.codice || '', h.elemento || '',
       h.origine || '', h.destinazione || '', h.userName || h.user || '',
       h.lineaBlu ? 'Sì' : '', h.vuoto ? 'Sì' : '',
-    ]));
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    for (let r = 2; r <= aoa.length; r++) { const c = ws['A' + r]; if (c && c.t === 'n') c.z = 'dd/mm/yyyy hh:mm'; }
-    ws['!cols'] = [{ wch: 17 }, { wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 8 }];
-    ws['!autofilter'] = { ref: 'A1:' + XLSX.utils.encode_cell({ r: aoa.length - 1, c: head.length - 1 }) };
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Storico');
+    ]);
+    const bytes = _xlsxBytes(head, dati, [17, 24, 17, 15, 20, 20, 22, 11, 9]);
+    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
-    XLSX.writeFile(wb, `Storico_${oggi}.xlsx`);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Storico_${oggi}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     showToast(`File Excel scaricato (${rows.length} movimenti).`, 'success');
   } catch (e) {
     showToast('Errore: ' + e.message, 'error');
-  } finally {
-    if (btn) { btn.disabled = !_storicoRows.length; btn.textContent = '📥 Scarica Excel'; }
   }
 };
 
