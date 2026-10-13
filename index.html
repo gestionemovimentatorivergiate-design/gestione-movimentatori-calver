@@ -146,12 +146,12 @@
     <div class="pageHeader">Storico movimenti</div>
     <div class="pageSubtitle">Tutte le azioni registrate</div>
     <div class="filterBar">
-      <input type="text" id="st-cerca" placeholder="Cerca elemento / ubicazione…" oninput="renderStorico()">
+      <input type="text" id="st-cerca" placeholder="Cerca ID / elemento / ubicazione…" oninput="renderStorico()">
       <select id="st-azione" onchange="renderStorico()"><option value="">Tutte le azioni</option></select>
     </div>
     <div class="tableWrap">
       <table>
-        <thead><tr><th>Data</th><th>Azione</th><th>Elemento</th><th>Percorso</th><th>Utente</th></tr></thead>
+        <thead><tr><th>Data</th><th>Azione</th><th>ID missione</th><th>Elemento</th><th>Percorso</th><th>Utente</th></tr></thead>
         <tbody id="st-body"></tbody>
       </table>
     </div>
