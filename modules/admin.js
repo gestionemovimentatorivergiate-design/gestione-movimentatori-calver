@@ -8,7 +8,8 @@ import {
   getAuth, createUserWithEmailAndPassword, signOut
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  doc, getDoc, setDoc, updateDoc, deleteDoc
+  doc, getDoc, setDoc, updateDoc, deleteDoc,
+  collection, getDocs, query, limit, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { showToast, esc, fmtDate, tsVal } from '../shared-utils.js';
 
@@ -54,6 +55,10 @@ export function renderStorico() {
     (!fData || giorno(h) === fData) &&
     (!fId  || (h.codice || '').toLowerCase().includes(fId)));
 
+  // Pulsante "Elimina dati storici": visibile solo all'amministratore
+  const btnReset = document.getElementById('st-reset');
+  if (btnReset) btnReset.style.display = (_getUser()?.role === 'amministratore') ? 'inline-flex' : 'none';
+
   const cnt = document.getElementById('st-count');
   if (cnt) cnt.textContent = `${rows.length} di ${H.length} movimenti caricati`;
 
@@ -75,6 +80,7 @@ function _azBadge(a) {
     'Pieno preso in carico':'orange',
     'Consegna completata':  'green',
     'Missione annullata':   'red',
+    'Storico eliminato':    'red',
   };
   const color = map[a] || 'muted';
   const bg = { blue: '#3b82f613;color:#1d4ed8', orange: '#f59e0b13;color:#b45309', green: '#A4D20018;color:#7fa000', red: '#ef444413;color:#dc2626', muted: 'transparent;color:#6b7280' }[color];
@@ -228,6 +234,40 @@ window.addUser = async function () {
 
 // Esposta su window: i filtri dello storico la richiamano da onclick/oninput inline
 window.renderStorico = renderStorico;
+// ── ELIMINA DATI STORICI (solo amministratore) ──────────────────────────────
+// Svuota l'intera raccolta `history` (non solo le 300 voci mostrate), a blocchi.
+// Doppia conferma: finestra di avviso + parola "ELIMINA" da scrivere.
+// Protezione anche lato server: le regole Firestore permettono la cancellazione
+// di `history` solo agli amministratori.
+window.eliminaStorico = async function () {
+  const u = _getUser();
+  if (!u || u.role !== 'amministratore') { showToast('Solo un amministratore può eliminare lo storico.', 'error'); return; }
+  if (!confirm('Eliminare TUTTO lo storico?\n\nL\'operazione cancella ogni movimento registrato e NON si può annullare.')) return;
+  if (prompt('Per confermare scrivi ELIMINA (in maiuscolo):') !== 'ELIMINA') {
+    showToast('Eliminazione annullata.', 'error'); return;
+  }
+  const btn = document.getElementById('st-reset');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Eliminazione…'; }
+  try {
+    let tot = 0;
+    for (;;) {
+      const snap = await getDocs(query(collection(window.db, 'history'), limit(400)));
+      if (snap.empty) break;
+      const batch = writeBatch(window.db);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      tot += snap.size;
+    }
+    // Traccia dell'operazione: resta come unica voce nello storico appena svuotato
+    await window.logHistory({ action: 'Storico eliminato', voci: tot });
+    showToast(`Storico eliminato (${tot} voci).`, 'success');
+  } catch (e) {
+    showToast('Errore: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗑 ELIMINA DATI STORICI'; }
+  }
+};
+
 window.resetFiltriStorico = function () {
   ['st-data', 'st-id', 'st-utente', 'st-percorso', 'st-elemento', 'st-azione'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
