@@ -23,6 +23,9 @@ jobs:
         run: |
           HASH=$(date +%s)
           sed -i -E "s/(\.js|\.css)(\?v=[^'\"]*)?([\"'])/\1?v=$HASH\3/g" index.html app.js
+          # NON toccare gli import di librerie esterne (gstatic/Firebase): un ?v= li farebbe
+          # caricare due volte (due copie dell'SDK) e collection()/doc() darebbero errore.
+          sed -i -E "s#(https://[^'\"]*\.js)\?v=[0-9]+#\1#g" app.js
 
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
