@@ -3,14 +3,20 @@
 //  1) crea la missione (da un'ubicazione a un'altra)
 //  2) annulla le proprie missioni ancora IN ATTESA (mai in transito)
 //
-// missioni/{id} : elemento + origine/destinazione + stato
+// missioni/{ID} : l'ID del documento è il codice univoco della missione, formato
+//    ####-ggmmaaaa (es. 0001-05102026): progressivo del giorno (da mezzanotte, ora di
+//    Roma) + data. Generato dall'app in una transazione e salvato anche nel campo
+//    `codice`; non esiste nessun campo/azione per modificarlo.
+//    Il progressivo è tenuto in un documento contatore `missioni/_cnt-ggmmaaaa`
+//    (senza createdAt, quindi mai incluso nella lista delle missioni).
+//    elemento + origine/destinazione + stato
 //    stato: richiesta → in_transito → consegnata   (+ annullata da 'richiesta')
 //    lineaBlu: true se la missione è prioritaria (spunta "Linea Blu"); assente = false
 //    vuoto: true se è una missione di vuoto (spunta "Vuoto"); assente = false. Non cambia
 //           l'ordinamento. Vuoto e Linea Blu sono mutuamente esclusive.
 
 import {
-  collection, doc, addDoc, updateDoc, serverTimestamp
+  doc, updateDoc, runTransaction, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { showToast, esc, fmtDate, tsVal } from '../shared-utils.js';
 
@@ -137,6 +143,14 @@ function _badgeVuoto(m) {
 }
 function _styleBlu(m) { return m.lineaBlu ? ` style="${BLU_BORDER}"` : ''; }
 
+// Data di oggi come ggmmaaaa, fuso orario di Roma (la "mezzanotte" è quella locale)
+function _oggiGGMMAAAA() {
+  const p = new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' })
+    .formatToParts(new Date());
+  const g = t => p.find(x => x.type === t).value;
+  return g('day') + g('month') + g('year');
+}
+
 window.creaMissione = async function () {
   const u = _getUser();
   const st = _getState();
@@ -159,22 +173,34 @@ window.creaMissione = async function () {
   const btn = document.getElementById('nm-btn');
   btn.disabled = true; btn.textContent = '⏳ Creazione…';
   try {
-    await addDoc(collection(window.db, 'missioni'), {
-      elementoId: elId, elementoCodice: elemento.codice,
-      origineId: orId, origineNome: origine.nome,
-      destinazioneId: deId, destinazioneNome: destinazione.nome,
-      lineaBlu, vuoto,
-      stato: 'richiesta',
-      navettaId: null, navettaNome: null,
-      ownerUid: u.uid, ownerNome: u.name || u.email,
-      createdAt: serverTimestamp(), presaInCaricoAt: null, consegnataAt: null,
+    // ID univoco: ####-ggmmaaaa. Transazione sul contatore del giorno: due utenti
+    // che creano nello stesso istante non possono ottenere lo stesso numero.
+    const giorno = _oggiGGMMAAAA();
+    const cntRef = doc(window.db, 'missioni', '_cnt-' + giorno);
+    let codice = '';
+    await runTransaction(window.db, async (tx) => {
+      const snap = await tx.get(cntRef);
+      const n = (snap.exists() ? (snap.data().n || 0) : 0) + 1;
+      codice = String(n).padStart(4, '0') + '-' + giorno;
+      tx.set(cntRef, { n, giorno });
+      tx.set(doc(window.db, 'missioni', codice), {
+        codice,
+        elementoId: elId, elementoCodice: elemento.codice,
+        origineId: orId, origineNome: origine.nome,
+        destinazioneId: deId, destinazioneNome: destinazione.nome,
+        lineaBlu, vuoto,
+        stato: 'richiesta',
+        navettaId: null, navettaNome: null,
+        ownerUid: u.uid, ownerNome: u.name || u.email,
+        createdAt: serverTimestamp(), presaInCaricoAt: null, consegnataAt: null,
+      });
     });
     await window.logHistory({
-      action: 'Missione creata', elemento: elemento.codice,
+      action: 'Missione creata', codice, elemento: elemento.codice,
       origine: origine.nome, destinazione: destinazione.nome,
       lineaBlu, vuoto,
     });
-    showToast(`Missione${lineaBlu ? ' LINEA BLU' : ''}${vuoto ? ' VUOTO' : ''} creata: ${elemento.codice} → ${destinazione.nome}`, 'success');
+    showToast(`Missione${lineaBlu ? ' LINEA BLU' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${elemento.codice} → ${destinazione.nome}`, 'success');
     // Reset selezioni
     document.getElementById('nm-elemento').value = '';
     document.getElementById('nm-origine').value = '';
@@ -215,6 +241,7 @@ function _cardMissioneAttesa(m) {
   return `
     <div class="mCard pieno"${_styleBlu(m)}>
       <div class="mHead">
+        ${m.codice ? `<span class="mono" style="font-size:12px;font-weight:700;color:var(--muted)">${esc(m.codice)}</span>` : ''}
         <span class="mElemento">${esc(m.elementoCodice)}</span>
         ${_badgeBlu(m)}
         ${_badgeVuoto(m)}
@@ -238,7 +265,7 @@ window.annullaMissione = async function (id) {
   if (!confirm(`Annullare la missione ${m.elementoCodice} → ${m.destinazioneNome}?`)) return;
   try {
     await updateDoc(doc(window.db, 'missioni', id), { stato: 'annullata', annullataAt: serverTimestamp() });
-    await window.logHistory({ action: 'Missione annullata', elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
+    await window.logHistory({ action: 'Missione annullata', codice: m.codice || null, elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
     showToast('Missione annullata.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };

@@ -86,6 +86,7 @@ function _card(item) {
   return `
     <div class="mCard pieno"${blu ? ' style="border-left:4px solid #2563eb;"' : ''}>
       <div class="mHead">
+        ${item.codice ? `<span class="mono" style="font-size:12px;font-weight:700;color:var(--muted)">${esc(item.codice)}</span>` : ''}
         <span class="mElemento">${esc(item.elementoCodice)}</span>
         ${badgeBlu}
         ${badgeVuoto}
@@ -118,7 +119,7 @@ window.prendiMissione = async function (id) {
   const m = _getState().missioni.find(x => x.id === id);
   try {
     await _prendi('missioni', id, 'richiesta');
-    if (m) await window.logHistory({ action: 'Pieno preso in carico', elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
+    if (m) await window.logHistory({ action: 'Pieno preso in carico', codice: m.codice || null, elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
     showToast('Missione presa in carico.', 'success');
   } catch (e) { showToast(e.message || 'Errore', 'error'); }
 };
@@ -142,7 +143,7 @@ window.confermaMissione = async function (id) {
   const m = _getState().missioni.find(x => x.id === id);
   try {
     await _conferma('missioni', id, 'in_transito', 'consegnata', 'consegnataAt');
-    if (m) await window.logHistory({ action: 'Consegna completata', elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
+    if (m) await window.logHistory({ action: 'Consegna completata', codice: m.codice || null, elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
     showToast('Consegna confermata.', 'success');
   } catch (e) { showToast(e.message || 'Errore', 'error'); }
 };

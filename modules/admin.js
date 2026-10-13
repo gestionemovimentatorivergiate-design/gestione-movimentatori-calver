@@ -41,6 +41,7 @@ export function renderStorico() {
   let rows = H;
   if (fAz) rows = rows.filter(h => h.action === fAz);
   if (q) rows = rows.filter(h =>
+    (h.codice || '').toLowerCase().includes(q) ||
     (h.elemento || '').toLowerCase().includes(q) ||
     (h.origine || '').toLowerCase().includes(q) ||
     (h.destinazione || '').toLowerCase().includes(q));
@@ -49,11 +50,12 @@ export function renderStorico() {
     <tr>
       <td class="mono" style="font-size:11px;white-space:nowrap">${fmtDate(h.ts)}</td>
       <td>${_azBadge(h.action)}</td>
+      <td class="mono" style="font-size:12px;white-space:nowrap">${esc(h.codice || '—')}</td>
       <td class="mono">${esc(h.elemento || '—')}</td>
       <td style="font-size:12px">${h.origine || h.destinazione ? esc(h.origine || '?') + ' → ' + esc(h.destinazione || '?') : '—'}</td>
       <td style="font-size:12px;color:var(--muted)">${esc(h.userName || h.user || '—')}</td>
     </tr>`).join('')
-    : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:18px">Nessun movimento</td></tr>';
+    : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:18px">Nessun movimento</td></tr>';
 }
 
 function _azBadge(a) {
