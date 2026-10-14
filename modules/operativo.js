@@ -4,7 +4,7 @@
 //  2) annulla le proprie missioni ancora IN ATTESA (mai in transito)
 //
 // missioni/{ID} : l'ID del documento è il codice univoco della missione, formato
-//    ####-ggmmaaaa (es. 0001-05102026): progressivo del giorno (da mezzanotte, ora di
+//    ####-gg-mmaaaa (es. 0001-05-102026): progressivo del giorno (da mezzanotte, ora di
 //    Roma) + data. Generato dall'app in una transazione e salvato anche nel campo
 //    `codice`; non esiste nessun campo/azione per modificarlo.
 //    Il progressivo è tenuto in un documento contatore `missioni/_cnt-ggmmaaaa`
@@ -173,7 +173,7 @@ window.creaMissione = async function () {
   const btn = document.getElementById('nm-btn');
   btn.disabled = true; btn.textContent = '⏳ Creazione…';
   try {
-    // ID univoco: ####-ggmmaaaa. Transazione sul contatore del giorno: due utenti
+    // ID univoco: ####-gg-mmaaaa. Transazione sul contatore del giorno: due utenti
     // che creano nello stesso istante non possono ottenere lo stesso numero.
     const giorno = _oggiGGMMAAAA();
     const cntRef = doc(window.db, 'missioni', '_cnt-' + giorno);
@@ -181,7 +181,7 @@ window.creaMissione = async function () {
     await runTransaction(window.db, async (tx) => {
       const snap = await tx.get(cntRef);
       const n = (snap.exists() ? (snap.data().n || 0) : 0) + 1;
-      codice = String(n).padStart(4, '0') + '-' + giorno;
+      codice = String(n).padStart(4, '0') + '-' + giorno.slice(0, 2) + '-' + giorno.slice(2);
       tx.set(cntRef, { n, giorno });
       tx.set(doc(window.db, 'missioni', codice), {
         codice,

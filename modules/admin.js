@@ -40,7 +40,8 @@ export function renderStorico() {
     if (list.includes(cur)) sel.value = cur;
     return sel.value;
   };
-  const fAz  = fill('st-azione',   H.map(h => h.action), 'Tutte');
+  const stato = h => h.action === 'Pieno preso in carico' ? 'Preso in carico' : (h.action || '');   // vecchie voci rinominate
+  const fAz  = fill('st-azione',   H.map(stato),         'Tutti');
   const fUt  = fill('st-utente',   H.map(utente),        'Tutti');
   const fPer = fill('st-percorso', H.map(percorso),      'Tutti');
   const fEl  = fill('st-elemento', H.map(h => h.elemento), 'Tutti');
@@ -53,16 +54,28 @@ export function renderStorico() {
   const nessunFiltro = !fAz && !fUt && !fPer && !fEl && !fData && !fId;
   const da = Date.now() - 7 * 24 * 3600 * 1000;
 
-  // Tutti i filtri attivi si combinano (AND)
-  const rows = H.filter(h =>
+  // Una missione compare se almeno una sua voce rispetta TUTTI i filtri (AND);
+  // della missione si vedono poi tutti gli stati.
+  const chiave = h => h.codice || ('_' + h.id);
+  // Il filtro Stato guarda lo stato ATTUALE della missione (la sua voce più recente)
+  const tvH = h => h.ts ? h.ts.getTime() : Number.MAX_SAFE_INTEGER;
+  const ultimo = new Map();
+  H.forEach(h => { const k = chiave(h), o = ultimo.get(k); if (!o || tvH(h) >= tvH(o)) ultimo.set(k, h); });
+  const trovate = new Set(H.filter(h =>
     (!nessunFiltro || !h.ts || h.ts.getTime() >= da) &&
-    (!fAz  || h.action === fAz) &&
+    (!fAz  || stato(ultimo.get(chiave(h))) === fAz) &&
     (!fUt  || utente(h) === fUt) &&
     (!fPer || percorso(h) === fPer) &&
     (!fEl  || h.elemento === fEl) &&
     (!fData || giorno(h) === fData) &&
-    (!fId  || (h.codice || '').toLowerCase().includes(fId)));
-  _storicoRows = rows;      // righe visibili: sono quelle che scarica il pulsante Excel
+    (!fId  || (h.codice || '').toLowerCase().includes(fId))).map(chiave));
+
+  const tv = h => h.ts ? h.ts.getTime() : Number.MAX_SAFE_INTEGER;
+  const gruppi = new Map();
+  H.forEach(h => { const k = chiave(h); if (!trovate.has(k)) return; if (!gruppi.has(k)) gruppi.set(k, []); gruppi.get(k).push(h); });
+  const lista = [...gruppi.entries()].map(([k, v]) => ({ k, v: v.sort((x, y) => tv(x) - tv(y)) }))
+    .sort((x, y) => tv(y.v[y.v.length - 1]) - tv(x.v[x.v.length - 1]));   // ultima attività in alto
+  _storicoRows = lista.flatMap(g => g.v);      // sono le voci che scarica il pulsante Excel
 
   // Pulsante "Elimina dati storici": visibile solo all'amministratore
   const btnReset = document.getElementById('st-reset');
@@ -72,29 +85,58 @@ export function renderStorico() {
   if (cnt) {
     const lim = _getState().historyLimit;
     const troncato = lim && H.length >= lim ? ` ⚠ Sono caricate solo le ultime ${lim} voci: le più vecchie non sono incluse.` : '';
-    cnt.textContent = (nessunFiltro
-      ? `${rows.length} movimenti — ultimi 7 giorni (nessun filtro attivo).`
-      : `${rows.length} di ${H.length} movimenti caricati.`) + troncato;
+    cnt.textContent = `${lista.length} missioni (${_storicoRows.length} stati)` +
+      (nessunFiltro ? ' — ultimi 7 giorni (nessun filtro attivo).' : '.') + troncato;
   }
   const bx = document.getElementById('st-excel');
-  if (bx) bx.disabled = !rows.length;
+  if (bx) bx.disabled = !_storicoRows.length;
 
-  body.innerHTML = rows.length ? rows.map(h => `
+  const dataStr = d => d ? d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+  const oraStr = d => d ? d.toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit' }) : '—';
+  const prima = (v, f) => (v.find(h => f(h)) || v[0]);
+
+  body.innerHTML = lista.length ? lista.map(({ k, v }) => {
+    const p = v[0], ult = v[v.length - 1];
+    const el = prima(v, h => h.elemento).elemento;
+    const pe = prima(v, h => h.origine || h.destinazione);
+    const aperto = p.codice && _stAperti.has(k);
+    const idCell = p.codice
+      ? `<a href="#" onclick="toggleMissioneStorico('${esc(k)}');return false" style="color:var(--text);font-weight:700;text-decoration:underline">${aperto ? '▾' : '▸'} ${esc(p.codice)}</a>`
+      : '—';
+    let h = `
     <tr>
-      <td class="mono" style="font-size:11px;white-space:nowrap">${fmtDate(h.ts)}</td>
-      <td>${_azBadge(h.action)}</td>
-      <td class="mono" style="font-size:12px;white-space:nowrap">${esc(h.codice || '—')}</td>
-      <td class="mono">${esc(h.elemento || '—')}</td>
-      <td style="font-size:12px">${h.origine || h.destinazione ? esc(h.origine || '?') + ' → ' + esc(h.destinazione || '?') : '—'}</td>
-      <td style="font-size:12px;color:var(--muted)">${esc(h.userName || h.user || '—')}</td>
-    </tr>`).join('')
-    : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:18px">Nessun movimento</td></tr>';
+      <td class="mono" style="font-size:12px;white-space:nowrap">${dataStr(p.ts)}</td>
+      <td class="mono" style="font-size:12px;white-space:nowrap">${oraStr(p.ts)}</td>
+      <td class="mono" style="font-size:12px;white-space:nowrap">${idCell}</td>
+      <td>${_azBadge(stato(ult))}</td>
+      <td class="mono">${esc(el || '—')}</td>
+      <td style="font-size:12px">${pe.origine || pe.destinazione ? esc(pe.origine || '?') + ' → ' + esc(pe.destinazione || '?') : '—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${esc(utente(p) || '—')}</td>
+    </tr>`;
+    if (aperto) h += v.map(x => `
+    <tr style="background:rgba(0,0,0,.03)">
+      <td class="mono" style="font-size:11px;white-space:nowrap;padding-left:22px">${dataStr(x.ts)}</td>
+      <td class="mono" style="font-size:11px;white-space:nowrap">${oraStr(x.ts)}</td>
+      <td></td>
+      <td>${_azBadge(stato(x))}</td>
+      <td></td><td></td>
+      <td style="font-size:12px;color:var(--muted)">${esc(utente(x) || '—')}</td>
+    </tr>`).join('');
+    return h;
+  }).join('')
+    : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px">Nessun movimento</td></tr>';
 }
+
+const _stAperti = new Set();   // ID missione con il dettaglio stati aperto
+window.toggleMissioneStorico = function (k) {
+  if (_stAperti.has(k)) _stAperti.delete(k); else _stAperti.add(k);
+  renderStorico();
+};
 
 function _azBadge(a) {
   const map = {
     'Missione creata':      'blue',
-    'Pieno preso in carico':'orange',
+    'Preso in carico':      'orange',
     'Consegna completata':  'green',
     'Missione annullata':   'red',
     'Storico eliminato':    'red',
@@ -325,10 +367,10 @@ function _zip(files) {
 
 const _xe = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
-const _col = i => String.fromCharCode(65 + i);   // A..I (servono 9 colonne)
+const _col = i => String.fromCharCode(65 + i);   // A..J
 
 // Costruisce il file .xlsx: head = intestazioni, rows = array di array
-// (numero = numero/data seriale; stringa = testo). La colonna 0 è una data/ora.
+// (numero = numero/data seriale; stringa = testo). Colonna 0 = data, colonna 1 = ora.
 function _xlsxBytes(head, rows, larghezze) {
   const enc = new TextEncoder();
   const cell = (v, r, c, st) => {
@@ -339,21 +381,22 @@ function _xlsxBytes(head, rows, larghezze) {
   };
   let sd = `<row r="1">${head.map((h, c) => cell(h, 1, c, 2)).join('')}</row>`;
   rows.forEach((row, i) => {
-    sd += `<row r="${i + 2}">${row.map((v, c) => cell(v, i + 2, c, c === 0 && typeof v === 'number' ? 1 : 0)).join('')}</row>`;
+    sd += `<row r="${i + 2}">${row.map((v, c) => cell(v, i + 2, c, typeof v === 'number' ? (c === 0 ? 1 : c === 1 ? 3 : 0) : 0)).join('')}</row>`;
   });
   const NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
   const HD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
   const sheet = `${HD}<worksheet ${NS}><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` +
     `<cols>${larghezze.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>` +
     `<sheetData>${sd}</sheetData><autoFilter ref="A1:${_col(head.length - 1)}${rows.length + 1}"/></worksheet>`;
-  const styles = `${HD}<styleSheet ${NS}><numFmts count="1"><numFmt numFmtId="164" formatCode="dd/mm/yyyy\\ hh:mm"/></numFmts>` +
+  const styles = `${HD}<styleSheet ${NS}><numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="hh:mm"/></numFmts>` +
     `<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>` +
     `<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>` +
     `<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>` +
     `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
-    `<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+    `<cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
     `<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>` +
-    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>` +
+    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+    `<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>` +
     `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
   const T = (name, txt) => ({ name, data: enc.encode(txt) });
   return _zip([
@@ -366,28 +409,29 @@ function _xlsxBytes(head, rows, larghezze) {
   ]);
 }
 
-// Data/ora (ora di Roma) → numero seriale Excel, così la colonna è ordinabile come data
+// Data/ora (ora di Roma) → [data seriale Excel, frazione di giorno = ora]
 function _excelData(d) {
-  if (!d) return '';
+  if (!d) return ['', ''];
   const p = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Rome', hourCycle: 'h23',
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
   }).formatToParts(d);
   const g = t => +p.find(x => x.type === t).value;
-  return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second')) / 86400000 + 25569;
+  const giorni = Date.UTC(g('year'), g('month') - 1, g('day')) / 86400000 + 25569;
+  return [giorni, (g('hour') * 3600 + g('minute') * 60 + g('second')) / 86400];
 }
 
 window.scaricaStoricoExcel = function () {
   const rows = _storicoRows;
   if (!rows.length) { showToast('Nessun movimento da scaricare.', 'error'); return; }
   try {
-    const head = ['Data e ora', 'Azione', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Vuoto'];
+    const head = ['Data', 'Ora', 'Stato', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Vuoto'];
     const dati = rows.map(h => [
-      _excelData(h.ts), h.action || '', h.codice || '', h.elemento || '',
+      ..._excelData(h.ts), (h.action === 'Pieno preso in carico' ? 'Preso in carico' : (h.action || '')), h.codice || '', h.elemento || '',
       h.origine || '', h.destinazione || '', h.userName || h.user || '',
       h.lineaBlu ? 'Sì' : '', h.vuoto ? 'Sì' : '',
     ]);
-    const bytes = _xlsxBytes(head, dati, [17, 24, 17, 15, 20, 20, 22, 11, 9]);
+    const bytes = _xlsxBytes(head, dati, [12, 8, 22, 17, 15, 20, 20, 22, 11, 9]);
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
     const a = document.createElement('a');
