@@ -147,17 +147,36 @@ async function doLogin() {
   errEl.style.display = 'none';
   if (!username || !pass) { errEl.textContent = 'Inserisci username e password.'; errEl.style.display = 'block'; return; }
   btn.textContent = 'Accesso…'; btn.disabled = true;
+  const mostra = m => { errEl.textContent = m; errEl.style.display = 'block'; };
   try {
-    const snap = await getDoc(doc(window.db, 'usernames', username));
-    if (!snap.exists()) { errEl.textContent = 'Utente non trovato.'; errEl.style.display = 'block'; return; }
-    await signInWithEmailAndPassword(window.auth, snap.data().email, pass);
+    // 1) Ricerca username → email (database)
+    let snap;
+    try {
+      snap = await getDoc(doc(window.db, 'usernames', username));
+    } catch (e) {
+      console.error('Login - lettura username fallita:', e.code, e.message);
+      mostra(e.code === 'permission-denied'
+        ? 'Accesso al database negato (regole Firestore). [' + e.code + ']'
+        : 'Impossibile contattare il database: connessione assente o bloccata da un\'estensione/antivirus/rete (es. ad-blocker). Prova in incognito o da un altro dispositivo. [' + (e.code || e.message) + ']');
+      return;
+    }
+    if (!snap.exists()) { mostra('Utente non trovato.'); return; }
+    const email = snap.data().email;
+    if (!email) { mostra('Utente senza email associata: contatta l\'amministratore.'); return; }
+
+    // 2) Autenticazione
+    await signInWithEmailAndPassword(window.auth, email, pass);
   } catch (e) {
-    let msg = 'Credenziali non valide.';
+    console.error('Login - autenticazione fallita:', e.code, e.message);
+    let msg = 'Accesso non riuscito. [' + (e.code || e.message) + ']';
     if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') msg = 'Username o password errata.';
     if (e.code === 'auth/user-not-found')          msg = 'Utente non trovato.';
+    if (e.code === 'auth/user-disabled')           msg = 'Utente disabilitato.';
     if (e.code === 'auth/too-many-requests')       msg = 'Troppi tentativi. Riprova più tardi.';
-    if (e.code === 'auth/network-request-failed')  msg = 'Errore di rete.';
-    errEl.textContent = msg; errEl.style.display = 'block';
+    if (e.code === 'auth/network-request-failed')  msg = 'Errore di rete: connessione assente o bloccata (ad-blocker/antivirus/rete).';
+    if (e.code === 'auth/operation-not-allowed')   msg = 'Accesso con email/password non abilitato in Firebase. [' + e.code + ']';
+    if (e.code === 'auth/invalid-api-key' || e.code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.') msg = 'Chiave API Firebase non valida. [' + e.code + ']';
+    mostra(msg);
   } finally {
     btn.textContent = 'Accedi'; btn.disabled = false;
   }
