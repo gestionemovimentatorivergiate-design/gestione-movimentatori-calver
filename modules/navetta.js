@@ -119,7 +119,7 @@ window.prendiMissione = async function (id) {
   const m = _getState().missioni.find(x => x.id === id);
   try {
     await _prendi('missioni', id, 'richiesta');
-    if (m) await window.logHistory({ action: 'Preso in carico', codice: m.codice || null, elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
+    if (m) await window.logHistory({ action: 'Pieno preso in carico', codice: m.codice || null, elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
     showToast('Missione presa in carico.', 'success');
   } catch (e) { showToast(e.message || 'Errore', 'error'); }
 };
