@@ -302,13 +302,13 @@ function _cardMissioneAttesa(m) {
     </div>`;
 }
 
-// ── AZIONE: annulla missione (solo 'richiesta', owner o admin) ────────────────
+// ── AZIONE: annulla missione (solo 'richiesta', solo l'utente che l'ha creata) ────────────────
 window.annullaMissione = async function (id) {
   const u = _getUser();
   const m = _getState().missioni.find(x => x.id === id);
   if (!m) return;
   if (m.stato !== 'richiesta') { showToast('Annullabile solo finché è in attesa.', 'error'); return; }
-  if (m.ownerUid !== u.uid && u.role !== 'amministratore') { showToast('Puoi annullare solo le tue missioni.', 'error'); return; }
+  if (m.ownerUid !== u.uid) { showToast('Puoi annullare solo le tue missioni.', 'error'); return; }
   if (!confirm(`Annullare la missione ${m.elementoCodice} → ${m.destinazioneNome}?`)) return;
   try {
     await updateDoc(doc(window.db, 'missioni', id), { stato: 'annullata', annullataAt: serverTimestamp() });
