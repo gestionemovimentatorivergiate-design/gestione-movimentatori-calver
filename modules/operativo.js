@@ -20,6 +20,7 @@ import {
   doc, updateDoc, runTransaction, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { showToast, esc, fmtDate, tsVal } from '../shared-utils.js';
+import './foglio.js';   // definisce window.stampaFoglioTrasferimento
 
 let _getState, _getUser;
 
@@ -295,6 +296,7 @@ function _cardMissioneAttesa(m) {
       <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
       <div class="mMeta">Creata: ${_dataOraSec(m.createdAt)}</div>
       <div class="mActions">
+        <button class="btnGray" onclick="stampaFoglioTrasferimento('${m.id}')">🖨 Stampa foglio trasferimento</button>
         <button class="btnGray" onclick="annullaMissione('${m.id}')">✕ Annulla</button>
       </div>
     </div>`;
