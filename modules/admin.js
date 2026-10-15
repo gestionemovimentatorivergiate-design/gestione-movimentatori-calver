@@ -92,7 +92,7 @@ export function renderStorico() {
   if (bx) bx.disabled = !_storicoRows.length;
 
   const dataStr = d => d ? d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
-  const oraStr = d => d ? d.toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit' }) : '—';
+  const oraStr = d => d ? d.toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
   const prima = (v, f) => (v.find(h => f(h)) || v[0]);
 
   body.innerHTML = lista.length ? lista.map(({ k, v }) => {
@@ -388,7 +388,7 @@ function _xlsxBytes(head, rows, larghezze) {
   const sheet = `${HD}<worksheet ${NS}><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` +
     `<cols>${larghezze.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>` +
     `<sheetData>${sd}</sheetData><autoFilter ref="A1:${_col(head.length - 1)}${rows.length + 1}"/></worksheet>`;
-  const styles = `${HD}<styleSheet ${NS}><numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="hh:mm"/></numFmts>` +
+  const styles = `${HD}<styleSheet ${NS}><numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="hh:mm:ss"/></numFmts>` +
     `<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>` +
     `<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>` +
     `<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>` +
@@ -431,7 +431,7 @@ window.scaricaStoricoExcel = function () {
       h.origine || '', h.destinazione || '', h.userName || h.user || '',
       h.lineaBlu ? 'Sì' : '', h.vuoto ? 'Sì' : '',
     ]);
-    const bytes = _xlsxBytes(head, dati, [12, 8, 22, 17, 15, 20, 20, 22, 11, 9]);
+    const bytes = _xlsxBytes(head, dati, [12, 10, 22, 17, 15, 20, 20, 22, 11, 9]);
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
     const a = document.createElement('a');

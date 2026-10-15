@@ -143,6 +143,15 @@ function _badgeVuoto(m) {
 }
 function _styleBlu(m) { return m.lineaBlu ? ` style="${BLU_BORDER}"` : ''; }
 
+// Data e ora con i secondi (ora di Roma): gg/mm/aa hh:mm:ss
+function _dataOraSec(t) {
+  if (!t) return '—';
+  const d = t.toDate ? t.toDate() : new Date(t);
+  if (isNaN(d)) return '—';
+  return d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: '2-digit' })
+    + ' ' + d.toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
 // Data di oggi come ggmmaaaa, fuso orario di Roma (la "mezzanotte" è quella locale)
 function _oggiGGMMAAAA() {
   const p = new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -248,7 +257,7 @@ function _cardMissioneAttesa(m) {
         <span class="mStatoBadge richiesta">In attesa</span>
       </div>
       <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
-      <div class="mMeta">Creata: ${fmtDate(m.createdAt)}</div>
+      <div class="mMeta">Creata: ${_dataOraSec(m.createdAt)}</div>
       <div class="mActions">
         <button class="btnGray" onclick="annullaMissione('${m.id}')">✕ Annulla</button>
       </div>
