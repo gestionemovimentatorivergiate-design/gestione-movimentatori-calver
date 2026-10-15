@@ -7,13 +7,12 @@ import { getAuth }       from 'https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getFirestore }  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 export const firebaseConfig = {
-  apiKey:            "AIzaSyB5AcDkQ_4sDn3W6d_2weGIApiDR0y4_ig",
-  authDomain:        "gestione-movimentatori-calver.firebaseapp.com",
-  projectId:         "gestione-movimentatori-calver",
-  storageBucket:     "gestione-movimentatori-calver.firebasestorage.app",
-  messagingSenderId: "401287586484",
-  appId:             "1:401287586484:web:6699682566475a3445ede1",
-  measurementId:     "G-BFG8B8RDQB",
+  apiKey: "AIzaSyB5FGdkTUkhkpjYdcK3H11z7yqeT19cZCk",
+  authDomain: "movimentazione-vergiate.firebaseapp.com",
+  projectId: "movimentazione-vergiate",
+  storageBucket: "movimentazione-vergiate.firebasestorage.app",
+  messagingSenderId: "14215181073",
+  appId: "1:14215181073:web:9b690340bb57b898a992b0"
 };
 
 const app   = initializeApp(firebaseConfig);
