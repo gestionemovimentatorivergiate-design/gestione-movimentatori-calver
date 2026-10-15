@@ -94,10 +94,10 @@ export function renderNuovaMissione() {
       const wrap = document.createElement('label');
       wrap.id = 'nm-vuoto-wrap';
       wrap.style.cssText = 'display:flex;align-items:center;gap:10px;margin:12px 0;padding:10px 12px;' +
-        'border:1px solid #6b728066;border-radius:8px;background:#6b728012;cursor:pointer;' +
+        'border:1px solid #16a34a55;border-radius:8px;background:#16a34a12;cursor:pointer;' +
         'font-weight:700;user-select:none';
-      wrap.innerHTML = '<input type="checkbox" id="nm-vuoto" style="width:20px;height:20px;margin:0;accent-color:#6b7280;cursor:pointer">' +
-        '<span>⚪ Vuoto</span>' +
+      wrap.innerHTML = '<input type="checkbox" id="nm-vuoto" style="width:20px;height:20px;margin:0;accent-color:#16a34a;cursor:pointer">' +
+        '<span>🟢 Vuoto</span>' +
         '<span id="nm-vuoto-hint" style="font-size:11px;font-weight:500;color:var(--muted);margin-left:auto"></span>';
       anchor.parentNode.insertBefore(wrap, anchor.id === 'nm-btn' ? anchor : anchor.nextSibling);
     }
@@ -168,7 +168,7 @@ function _badgeRossa(m) {
 }
 function _badgeVuoto(m) {
   return m.vuoto
-    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#6b7280;color:#fff;letter-spacing:.3px">⚪ VUOTO</span>'
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#16a34a;color:#fff;letter-spacing:.3px">🟢 VUOTO</span>'
     : '';
 }
 function _styleBlu(m) {
