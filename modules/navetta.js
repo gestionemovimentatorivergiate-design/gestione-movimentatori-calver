@@ -45,7 +45,7 @@ export function renderInCorso() {
   // ordinata per anzianità. Prendere un elemento non lo sposta di posizione
   // (la card "rimane" dov'era), perché lineaBlu e createdAt non cambiano.
   const lista = avMiss.concat(tkMiss)
-    .sort((a, b) => (b.lineaBlu ? 1 : 0) - (a.lineaBlu ? 1 : 0)
+    .sort((a, b) => ((b.lineaBlu || b.lineaRossa) ? 1 : 0) - ((a.lineaBlu || a.lineaRossa) ? 1 : 0)
                  || tsVal(a.createdAt) - tsVal(b.createdAt));
 
   // Statistiche
@@ -79,16 +79,21 @@ function _card(item) {
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#2563eb;color:#fff;letter-spacing:.3px">🔵 LINEA BLU</span>'
     : '';
 
+  const badgeRossa = item.lineaRossa
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#dc2626;color:#fff;letter-spacing:.3px">🔴 LINEA ROSSA</span>'
+    : '';
+
   const badgeVuoto = item.vuoto
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#6b7280;color:#fff;letter-spacing:.3px">⚪ VUOTO</span>'
     : '';
 
   return `
-    <div class="mCard pieno"${blu ? ' style="border-left:4px solid #2563eb;"' : ''}>
+    <div class="mCard pieno"${blu ? ' style="border-left:4px solid #2563eb;"' : item.lineaRossa ? ' style="border-left:4px solid #dc2626;"' : ''}>
       <div class="mHead">
         ${item.codice ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;letter-spacing:.5px;color:var(--muted)">${esc(item.codice)}</span>` : ''}
         <span class="mElemento">${esc(item.elementoCodice)}</span>
         ${badgeBlu}
+        ${badgeRossa}
         ${badgeVuoto}
         ${statoBadge}
       </div>

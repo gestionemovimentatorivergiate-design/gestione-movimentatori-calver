@@ -367,7 +367,7 @@ function _zip(files) {
 
 const _xe = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
-const _col = i => String.fromCharCode(65 + i);   // A..J
+const _col = i => String.fromCharCode(65 + i);   // A..K
 
 // Costruisce il file .xlsx: head = intestazioni, rows = array di array
 // (numero = numero/data seriale; stringa = testo). Colonna 0 = data, colonna 1 = ora.
@@ -425,13 +425,13 @@ window.scaricaStoricoExcel = function () {
   const rows = _storicoRows;
   if (!rows.length) { showToast('Nessun movimento da scaricare.', 'error'); return; }
   try {
-    const head = ['Data', 'Ora', 'Stato', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Vuoto'];
+    const head = ['Data', 'Ora', 'Stato', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Linea Rossa', 'Vuoto'];
     const dati = rows.map(h => [
       ..._excelData(h.ts), (h.action === 'Pieno preso in carico' ? 'Preso in carico' : (h.action || '')), h.codice || '', h.elemento || '',
       h.origine || '', h.destinazione || '', h.userName || h.user || '',
-      h.lineaBlu ? 'Sì' : '', h.vuoto ? 'Sì' : '',
+      h.lineaBlu ? 'Sì' : '', h.lineaRossa ? 'Sì' : '', h.vuoto ? 'Sì' : '',
     ]);
-    const bytes = _xlsxBytes(head, dati, [12, 10, 22, 17, 15, 20, 20, 22, 11, 9]);
+    const bytes = _xlsxBytes(head, dati, [12, 10, 22, 17, 15, 20, 20, 22, 11, 12, 9]);
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
     const a = document.createElement('a');
