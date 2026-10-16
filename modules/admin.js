@@ -181,6 +181,7 @@ export function renderStatistiche() {
   };
 
   // Descrizione del building di un punto carico-scarico (se manca, il nome del building)
+  const bDescId = bid => { const b = bMap[bid]; return b ? (b.descrizione || b.nome || '').trim() : ''; };
   const bDesc = ubId => {
     const b = bMap[ubMap[ubId]?.buildingId]; if (!b) return '';
     return (b.descrizione || b.nome || '').trim();
@@ -263,15 +264,15 @@ export function renderStatistiche() {
     <div class="statCard violet"><div class="val">${_fmtDurMs(t3.ms)}</div><div class="lbl">Tempo medio totale</div></div>`;
 
   // Tabella a barre (nome | missioni con barretta e numero [| partenze | arrivi])
-  const tabella = (res, selKey, semplice, vuoto) => {
+  const tabella = (res, selKey, semplice, vuoto, colNome = 'Nome', conArea = false) => {
     let rows = Object.entries(res);
     if (selKey) rows = rows.filter(([k]) => k === selKey);
     rows.sort((x, y) => y[1].tot - x[1].tot || x[1].nome.localeCompare(y[1].nome, 'it', { numeric: true }));
     if (!rows.length) return `<div style="color:var(--muted);font-size:13px;padding:10px 2px">${vuoto || 'Nessun dato'}</div>`;
     const max = rows[0][1].tot || 1;
     return `<div class="tableWrap"><table>
-      <thead><tr><th>Nome</th><th>Missioni</th>${semplice ? '' : '<th style="text-align:center">Partenze</th><th style="text-align:center">Arrivi</th>'}</tr></thead>
-      <tbody>${rows.map(([, e]) => `<tr><td>${esc(e.nome)}</td>
+      <thead><tr><th>${colNome}</th>${conArea ? '<th>Area</th>' : ''}<th>Missioni</th>${semplice ? '' : '<th style="text-align:center">Partenze</th><th style="text-align:center">Arrivi</th>'}</tr></thead>
+      <tbody>${rows.map(([, e]) => `<tr><td>${esc(e.nome)}</td>${conArea ? `<td>${esc(e.area || '')}</td>` : ''}
         <td style="min-width:130px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${e.tot / max * 100}%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div><b>${e.tot}</b></div></td>
         ${semplice ? '' : `<td style="text-align:center">${e.da}</td><td style="text-align:center">${e.a}</td>`}</tr>`).join('')}</tbody>
     </table></div>`;
@@ -331,18 +332,20 @@ export function renderStatistiche() {
     return r;
   };
   const B = sezione({ bp: lBBp });
-  const bRes = conta(bldgs, k => bLabel(k), B.M);
+  const bRes = conta(bldgs, k => k, B.M);
+  Object.keys(bRes).forEach(k => { bRes[k].area = bDescId(k); });
   B.M.forEach(m => {
     const bo = ubMap[m.origineId]?.buildingId, bd = ubMap[m.destinazioneId]?.buildingId;
     if (bo && bRes[bo]) bRes[bo].da++;
     if (bd && bRes[bd]) bRes[bd].a++;
   });
   const bEl = document.getElementById('stat-building');
-  if (bEl) bEl.innerHTML = tabella(bRes, B.f.bp[0] === 'b' ? B.f.bp.slice(2) : '');
+  if (bEl) bEl.innerHTML = tabella(bRes, B.f.bp[0] === 'b' ? B.f.bp.slice(2) : '', false, '', 'Building', true);
 
   // ── 4. Missioni per Punto carico-scarico ──
   const P = sezione({ bp: lPBp });
-  const pRes = conta(punti, (k, m) => (ubMap[k]?.nome || (k === m.origineId ? m.origineNome : m.destinazioneNome) || k) + (bDesc(k) ? ' · ' + bDesc(k) : ''), P.M);
+  const pRes = conta(punti, (k, m) => ubMap[k]?.nome || (k === m.origineId ? m.origineNome : m.destinazioneNome) || k, P.M);
+  Object.keys(pRes).forEach(k => { pRes[k].area = bDesc(k); });
   P.M.forEach(m => {
     if (m.origineId && pRes[m.origineId]) pRes[m.origineId].da++;
     if (m.destinazioneId && pRes[m.destinazioneId]) pRes[m.destinazioneId].a++;
@@ -350,7 +353,7 @@ export function renderStatistiche() {
   // Filtro per Building di appartenenza: restano solo i punti di quel building
   if (lPB) Object.keys(pRes).forEach(k => { if (ubMap[k]?.buildingId !== lPB) delete pRes[k]; });
   const pEl = document.getElementById('stat-punti');
-  if (pEl) pEl.innerHTML = tabella(pRes, P.f.bp[0] === 'u' ? P.f.bp.slice(2) : '');
+  if (pEl) pEl.innerHTML = tabella(pRes, P.f.bp[0] === 'u' ? P.f.bp.slice(2) : '', false, '', 'Punto di carico-scarico', true);
 }
 
 window.renderStatistiche = renderStatistiche;
