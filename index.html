@@ -196,6 +196,7 @@
       <div class="card" id="stat-tempi-blu" style="flex:1;min-width:210px;margin:0"></div>
       <div class="card" id="stat-tempi-rossa" style="flex:1;min-width:210px;margin:0"></div>
     </div>
+    <hr style="border:0;border-top:3px solid #4b5563;margin:6px 0 18px">
     <div class="card">
       <div class="cardTitle">Consegne completate per operatore</div>
       <div class="pageSubtitle" id="stat-giorni-sub" style="margin-top:-4px"></div>
@@ -209,7 +210,7 @@
     </div>
     <div class="card">
       <div class="cardTitle">Missioni per punto carico-scarico</div>
-      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Punto (sezione)</div><select id="sl-p-bp" onchange="renderStatistiche()"><option value="">Tutti i punti</option></select></div></div>
+      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Punto (sezione)</div><select id="sl-p-bp" onchange="renderStatistiche()"><option value="">Tutti i punti</option></select></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Building (sezione)</div><select id="sl-p-b" onchange="renderStatistiche()"><option value="">Tutti i building</option></select></div></div>
       <div id="stat-punti"></div>
     </div>
   </div>
