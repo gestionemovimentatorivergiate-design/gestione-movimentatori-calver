@@ -216,6 +216,11 @@ export function renderStatistiche() {
   const fOp = fillSel('ss-op', opts(ops, 'Tutti'), ops);
   fillSel('ss-elemento', opts(els, 'Tutti'), els);
   const fBp = fillSel('ss-bp', bpHtml, bpVals);
+  // Aree di movimentazione (per destinazione della missione)
+  const aree = (st.aree || []).slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+  const fArea = fillSel('ss-area', '<option value="">Tutte</option>' + aree.map(a => `<option value="${esc(a.id)}">${esc(a.nome)}</option>`).join(''), aree.map(a => a.id));
+  const areaSel = aree.find(a => a.id === fArea);
+  const areaPunti = areaSel ? (areaSel.puntiIds || []) : null;
   // filtri locali di sezione
   const lTOp = fillSel('sl-t-op', opts(ops, 'Tutti'), ops);
   const lTBp = fillSel('sl-t-bp', bpHtml, bpVals);
@@ -224,7 +229,7 @@ export function renderStatistiche() {
   const lPB = fillSel('sl-p-b', '<option value="">Tutti i building</option>' + bOpts.replace(/value="b:/g, 'value="'), st.buildings.map(b => b.id));
   const lPBp = fillSel('sl-p-bp', '<option value="">Tutti i punti</option>' + uOpts, bpVals);
 
-  const G = { op: fOp, el: _val('ss-elemento'), tipo: _val('ss-tipo'), bp: fBp };
+  const G = { op: fOp, el: _val('ss-elemento'), tipo: _val('ss-tipo'), bp: fBp, area: areaPunti };
   const fDa = _val('ss-da'), fA = _val('ss-a');
 
   // Building e punti toccati da una missione (origine e/o destinazione)
@@ -234,6 +239,7 @@ export function renderStatistiche() {
     (!f.op || m.navettaNome === f.op) &&
     (!f.el || m.elementoCodice === f.el) &&
     (!f.tipo || !!m[f.tipo]) &&
+    (!f.area || f.area.includes(m.destinazioneId)) &&
     (!f.bp || (f.bp[0] === 'b' ? bldgs(m).includes(f.bp.slice(2)) : punti(m).includes(f.bp.slice(2))));
   const inRange = (ms, da, a) => {
     if (!da && !a) return true;
@@ -359,7 +365,7 @@ export function renderStatistiche() {
 window.renderStatistiche = renderStatistiche;
 // Azzera i filtri globali e quelli di tutte le sezioni
 window.resetFiltriStat = function () {
-  ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp', 'ss-tipo',
+  ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp', 'ss-area', 'ss-tipo',
    'sl-t-op', 'sl-t-bp', 'sl-g-da', 'sl-g-a', 'sl-g-op', 'sl-b-bp', 'sl-p-bp', 'sl-p-b'
   ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   renderStatistiche();
