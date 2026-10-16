@@ -219,6 +219,11 @@ async function _avviaScanner(video, onCode) {
 }
 
 // ── Finestra "Conferma consegna" ─────────────────────────────────────────────
+// Telefono/tablet (schermo touch): lì è prevista la scansione con la fotocamera.
+// Su PC la conferma si fa digitando il punto di consegna.
+const _isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+  || (navigator.maxTouchPoints > 1 && window.matchMedia?.('(pointer:coarse)').matches);
+
 const _norm = s => String(s ?? '').trim().toUpperCase().replace(/\s+/g, '');
 
 window.confermaMissione = function (id) {
@@ -237,6 +242,7 @@ window.confermaMissione = function (id) {
   const punti = st.ubicazioni.filter(x => x.attivo !== false || x.id === m.destinazioneId)
     .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
 
+  const mobile = _isMobile();
   const ov = document.createElement('div');
   ov.className = 'modalOverlay open';
   ov.id = 'modalConfermaConsegna';
@@ -247,18 +253,21 @@ window.confermaMissione = function (id) {
     <div style="font-size:13px;color:var(--muted);margin-bottom:4px">Punto di destinazione</div>
     <div style="font-size:20px;font-weight:800;margin-bottom:14px">${esc(m.destinazioneNome)}</div>
 
-    <button class="btnOrange" id="cd-scan" style="width:100%;padding:14px;font-size:15px">📷 Scansiona barcode</button>
+    ${mobile ? `<button class="btnOrange" id="cd-scan" style="width:100%;padding:14px;font-size:15px">📷 Scansiona barcode</button>
     <div id="cd-cam" style="display:none;margin-top:10px">
       <video id="cd-video" playsinline muted style="width:100%;border-radius:10px;background:#000;max-height:260px;object-fit:cover"></video>
       <div style="font-size:12px;color:var(--muted);text-align:center;margin-top:4px">Inquadra il barcode del punto di destinazione</div>
       <button class="btnGray btnSmall" id="cd-stopcam" style="width:100%;margin-top:6px">Chiudi fotocamera</button>
-    </div>
+    </div>` : ''}
     <div id="cd-msg" style="display:none;margin-top:10px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600"></div>
 
-    <div style="display:flex;align-items:center;gap:10px;margin:16px 0 10px;color:var(--muted);font-size:12px;font-weight:700">
+    ${mobile ? `<div style="display:flex;align-items:center;gap:10px;margin:16px 0 10px;color:var(--muted);font-size:12px;font-weight:700">
       <div style="flex:1;height:1px;background:var(--border)"></div>OPPURE A MANO<div style="flex:1;height:1px;background:var(--border)"></div></div>
     <div class="field"><label>Punto di consegna</label>
-      <select id="cd-sel"><option value="">Seleziona il punto di consegna…</option>${punti.map(x => `<option value="${esc(x.id)}">${esc(etichetta(x))}</option>`).join('')}</select></div>
+      <select id="cd-sel"><option value="">Seleziona il punto di consegna…</option>${punti.map(x => `<option value="${esc(x.id)}">${esc(etichetta(x))}</option>`).join('')}</select></div>`
+    : `<div class="field" style="margin-top:14px"><label>Punto di consegna</label>
+      <input type="text" id="cd-txt" list="cd-lista" placeholder="Scrivi il punto, es. ${esc(m.destinazioneNome)}" autocomplete="off" spellcheck="false">
+      <datalist id="cd-lista">${punti.map(x => `<option value="${esc(x.nome)}">${esc(etichetta(x))}</option>`).join('')}</datalist></div>`}
     <button class="btnGreen" id="cd-manuale" style="width:100%">✅ Conferma manualmente</button>
     <div class="modalActions"><button class="btnGray" id="cd-chiudi">Annulla</button></div>
   </div>`;
@@ -277,7 +286,7 @@ window.confermaMissione = function (id) {
       return;
     }
     inCorso = true; _fermaScanner();
-    $('cd-manuale').disabled = true; $('cd-scan').disabled = true;
+    $('cd-manuale').disabled = true; if ($('cd-scan')) $('cd-scan').disabled = true;
     try {
       await _conferma('missioni', id, 'in_transito', 'consegnata', 'consegnataAt', {
         consegnaMetodo: metodo, consegnaPuntoId: ub.id, consegnaPuntoNome: ub.nome,
@@ -291,7 +300,7 @@ window.confermaMissione = function (id) {
       showToast('Consegna confermata.', 'success');
     } catch (e) {
       inCorso = false;
-      $('cd-manuale').disabled = false; $('cd-scan').disabled = false;
+      $('cd-manuale').disabled = false; if ($('cd-scan')) $('cd-scan').disabled = false;
       msg(e.message || 'Errore', false);
     }
   };
@@ -307,20 +316,33 @@ window.confermaMissione = function (id) {
   };
 
   $('cd-chiudi').onclick = chiudi;
-  $('cd-stopcam').onclick = () => { _fermaScanner(); $('cd-cam').style.display = 'none'; $('cd-scan').style.display = ''; };
-  $('cd-scan').onclick = async () => {
-    $('cd-msg').style.display = 'none';
-    $('cd-cam').style.display = 'block'; $('cd-scan').style.display = 'none';
-    try { await _avviaScanner($('cd-video'), alCodice); }
-    catch (e) {
-      $('cd-cam').style.display = 'none'; $('cd-scan').style.display = '';
-      msg(e.message || 'Fotocamera non disponibile.', false);
-    }
-  };
+  if (mobile) {
+    $('cd-stopcam').onclick = () => { _fermaScanner(); $('cd-cam').style.display = 'none'; $('cd-scan').style.display = ''; };
+    $('cd-scan').onclick = async () => {
+      $('cd-msg').style.display = 'none';
+      $('cd-cam').style.display = 'block'; $('cd-scan').style.display = 'none';
+      try { await _avviaScanner($('cd-video'), alCodice); }
+      catch (e) {
+        $('cd-cam').style.display = 'none'; $('cd-scan').style.display = '';
+        msg(e.message || 'Fotocamera non disponibile.', false);
+      }
+    };
+  }
   $('cd-manuale').onclick = () => {
-    const v = $('cd-sel').value;
-    if (!v) { msg('Seleziona il punto di consegna dal menù.', false); return; }
-    const ub = st.ubicazioni.find(x => x.id === v);
+    let ub = null;
+    if (mobile) {
+      const v = $('cd-sel').value;
+      if (!v) { msg('Seleziona il punto di consegna dal menù.', false); return; }
+      ub = st.ubicazioni.find(x => x.id === v);
+    } else {
+      const v = _norm($('cd-txt').value);
+      if (!v) { msg('Scrivi il punto di consegna.', false); return; }
+      ub = st.ubicazioni.find(x => _norm(x.nome) === v || _norm(x.id) === v);
+      if (!ub) { msg('Punto non trovato: controlla il nome e riprova.', false); return; }
+    }
     if (ub) conferma(ub, 'manuale');
   };
+  // Invio dalla tastiera (PC)
+  $('cd-txt')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('cd-manuale').click(); });
+  setTimeout(() => $('cd-txt')?.focus(), 50);
 };
