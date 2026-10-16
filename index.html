@@ -178,7 +178,7 @@
       <div id="stat-topElementi"></div>
     </div>
     <div class="card">
-      <div class="cardTitle">Attività per ubicazione</div>
+      <div class="cardTitle">Attività per punto carico-scarico</div>
       <div id="stat-topUbic"></div>
     </div>
   </div>
@@ -186,7 +186,7 @@
   <!-- ── PAGINA: ANAGRAFICHE (amministratore) ────────────────────────────────── -->
   <div class="page" id="pageAnagrafiche">
     <div class="pageHeader">Anagrafiche</div>
-    <div class="pageSubtitle">Elementi, building e ubicazioni — modificabili in qualsiasi momento</div>
+    <div class="pageSubtitle">Elementi, building e punti carico-scarico — modificabili in qualsiasi momento</div>
 
     <div class="card">
       <div class="cardTitle">Elementi</div>
@@ -210,10 +210,11 @@
     </div>
 
     <div class="card">
-      <div class="cardTitle">Ubicazioni</div>
+      <div class="cardTitle">Punti carico-scarico</div>
       <div class="field" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <input type="text" id="ub-nome" placeholder="Nome (es. Scaffale A / Linea 3)" style="flex:2;min-width:140px" onkeydown="if(event.key==='Enter')addUbicazione()">
         <select id="ub-building" style="flex:1;min-width:140px"><option value="">— building —</option></select>
+        <input type="text" id="ub-desc" placeholder="Descrizione (facolt.)" style="flex:2;min-width:140px" onkeydown="if(event.key==='Enter')addUbicazione()">
         <button class="btnGreen btnSmall" onclick="addUbicazione()">+ Aggiungi</button>
       </div>
       <div id="ub-list"></div>
