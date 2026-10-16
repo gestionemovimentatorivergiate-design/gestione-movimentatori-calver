@@ -28,6 +28,49 @@ export function initAnagrafiche({ getState, getUser }) {
   _getUser = getUser;
 }
 
+// ── Finestra di modifica (stesso stile della modifica missioni) ─────────────
+// campi: [{ id, label, tipo:'text'|'select'|'info', valore, opzioni:[{v,t}], placeholder, hint }]
+// onSave(valori) → async; deve lanciare Error('messaggio') per mostrare un errore e non chiudere.
+function _dialogModifica({ titolo, campi, onSave }) {
+  document.getElementById('modalModificaAnagrafica')?.remove();
+  const riga = c => {
+    const lab = `<label>${esc(c.label)}</label>`;
+    if (c.tipo === 'info') return `<div class="field">${lab}<div style="font-weight:700;padding:6px 0">${esc(c.valore)}</div></div>`;
+    if (c.tipo === 'select') {
+      return `<div class="field">${lab}<select id="ma-${c.id}">` +
+        c.opzioni.map(o => `<option value="${esc(o.v)}"${o.v === c.valore ? ' selected' : ''}>${esc(o.t)}</option>`).join('') +
+        `</select></div>`;
+    }
+    return `<div class="field">${lab}<input type="text" id="ma-${c.id}" value="${esc(c.valore || '')}" ` +
+      `placeholder="${esc(c.placeholder || '')}" spellcheck="false"></div>`;
+  };
+  const ov = document.createElement('div');
+  ov.className = 'modalOverlay open';
+  ov.id = 'modalModificaAnagrafica';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div class="modalBox"><h3>${esc(titolo)}</h3>${campi.map(riga).join('')}
+    <div class="modalActions">
+      <button class="btnGray" id="ma-chiudi">Chiudi</button>
+      <button class="btnGreen" id="ma-salva">Salva modifiche</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  const first = campi.find(c => c.tipo !== 'info');
+  if (first) document.getElementById('ma-' + first.id)?.focus();
+  document.getElementById('ma-chiudi').onclick = () => ov.remove();
+  ov.addEventListener('keydown', e => {
+    if (e.key === 'Escape') ov.remove();
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT') document.getElementById('ma-salva').click();
+  });
+  document.getElementById('ma-salva').onclick = async () => {
+    const val = {};
+    campi.forEach(c => { if (c.tipo !== 'info') val[c.id] = (document.getElementById('ma-' + c.id)?.value || '').trim(); });
+    const btn = document.getElementById('ma-salva');
+    btn.disabled = true; btn.textContent = '⏳ Salvataggio…';
+    try { await onSave(val); ov.remove(); }
+    catch (e) { btn.disabled = false; btn.textContent = 'Salva modifiche'; showToast(e.message || String(e), 'error'); }
+  };
+}
+
 function _requireAdmin() {
   const u = _getUser();
   if (!u || u.role !== 'amministratore') {
@@ -72,18 +115,24 @@ window.addElemento = async function () {
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
 
-window.renameElemento = async function (id) {
+window.renameElemento = function (id) {
   if (!_requireAdmin()) return;
   const e = _getState().elementi.find(x => x.id === id);
   if (!e) return;
-  const codice = prompt('Codice elemento:', e.codice);
-  if (codice === null) return;
-  const descrizione = prompt('Descrizione (facoltativa):', e.descrizione || '');
-  if (descrizione === null) return;
-  try {
-    await updateDoc(doc(window.db, 'elementi', id), { codice: codice.trim().toUpperCase(), descrizione: descrizione.trim() });
-    showToast('Elemento aggiornato.', 'success');
-  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+  _dialogModifica({
+    titolo: 'Modifica elemento',
+    campi: [
+      { id: 'codice', label: 'Codice', valore: e.codice },
+      { id: 'desc', label: 'Descrizione (facoltativa)', valore: e.descrizione || '' },
+    ],
+    onSave: async v => {
+      const codice = v.codice.toUpperCase();
+      if (!codice) throw new Error('Inserisci il codice elemento.');
+      if (_getState().elementi.some(x => x.id !== id && (x.codice || '').toUpperCase() === codice)) throw new Error('Codice già esistente.');
+      await updateDoc(doc(window.db, 'elementi', id), { codice, descrizione: v.desc });
+      showToast('Elemento aggiornato.', 'success');
+    },
+  });
 };
 
 window.toggleElemento = async function (id, attiva) {
@@ -158,18 +207,23 @@ window.addBuilding = async function () {
 };
 
 // L'ID non è modificabile: si cambiano solo nome e descrizione
-window.renameBuilding = async function (id) {
+window.renameBuilding = function (id) {
   if (!_requireAdmin()) return;
   const b = _getState().buildings.find(x => x.id === id);
   if (!b) return;
-  const nome = prompt(`Nome building (ID ${b.id}, non modificabile):`, b.nome);
-  if (nome === null || !nome.trim()) return;
-  const descrizione = prompt('Descrizione (facoltativa):', b.descrizione || '');
-  if (descrizione === null) return;
-  try {
-    await updateDoc(doc(window.db, 'ubicazioni', id), { nome: nome.trim(), descrizione: descrizione.trim() });
-    showToast('Building aggiornato.', 'success');
-  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+  _dialogModifica({
+    titolo: 'Modifica building',
+    campi: [
+      { id: 'id', label: 'ID (non modificabile)', tipo: 'info', valore: b.id },
+      { id: 'nome', label: 'Nome', valore: b.nome },
+      { id: 'desc', label: 'Descrizione (facoltativa)', valore: b.descrizione || '' },
+    ],
+    onSave: async v => {
+      if (!v.nome) throw new Error('Inserisci il nome del building.');
+      await updateDoc(doc(window.db, 'ubicazioni', id), { nome: v.nome, descrizione: v.desc });
+      showToast('Building aggiornato.', 'success');
+    },
+  });
 };
 
 window.toggleBuilding = async function (id, attiva) {
@@ -242,23 +296,29 @@ window.addUbicazione = async function () {
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
 
-window.renameUbicazione = async function (id) {
+window.renameUbicazione = function (id) {
   if (!_requireAdmin()) return;
   const u = _getState().ubicazioni.find(x => x.id === id);
   if (!u) return;
-  const nome = prompt('Nome punto carico-scarico:', u.nome);
-  if (nome === null || !nome.trim()) return;
-  const elenco = _getState().buildings.map(b => `${b.id} = ${b.nome}`).join('\n');
-  const bIn = prompt('ID Building:\n' + elenco, u.buildingId || '');
-  if (bIn === null) return;
-  const buildingId = bIn.trim().toUpperCase();
-  if (!_getState().buildings.some(b => b.id === buildingId)) { showToast('Building non valido: usa un ID esistente.', 'error'); return; }
-  const dIn = prompt('Descrizione (facoltativa, lascia vuoto per nessuna):', u.descrizione || '');
-  if (dIn === null) return;
-  try {
-    await updateDoc(doc(window.db, 'ubicazioni', id), { nome: nome.trim(), buildingId, descrizione: dIn.trim() });
-    showToast('Punto carico-scarico aggiornato.', 'success');
-  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+  // Building attivi (più quello attuale, anche se disattivato)
+  const bs = _getState().buildings.filter(b => b.attivo !== false || b.id === u.buildingId)
+    .sort((a, b) => String(a.id).localeCompare(String(b.id), 'it', { numeric: true }));
+  _dialogModifica({
+    titolo: 'Modifica punto carico-scarico',
+    campi: [
+      { id: 'nome', label: 'Nome', valore: u.nome },
+      { id: 'building', label: 'Building', tipo: 'select', valore: u.buildingId || '',
+        opzioni: [{ v: '', t: '— building —' }, ...bs.map(b => ({ v: b.id, t: `${b.id} · ${b.nome}` }))] },
+      { id: 'desc', label: 'Descrizione (facoltativa)', valore: u.descrizione || '' },
+    ],
+    onSave: async v => {
+      if (!v.nome) throw new Error('Inserisci il nome del punto carico-scarico.');
+      if (!_getState().buildings.some(b => b.id === v.building)) throw new Error('Seleziona un Building.');
+      if (_getState().ubicazioni.some(x => x.id !== id && (x.nome || '').toLowerCase() === v.nome.toLowerCase())) throw new Error('Punto carico-scarico già esistente.');
+      await updateDoc(doc(window.db, 'ubicazioni', id), { nome: v.nome, buildingId: v.building, descrizione: v.desc });
+      showToast('Punto carico-scarico aggiornato.', 'success');
+    },
+  });
 };
 
 window.toggleUbicazione = async function (id, attiva) {
