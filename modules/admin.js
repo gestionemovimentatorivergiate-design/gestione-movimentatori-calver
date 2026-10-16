@@ -180,6 +180,12 @@ export function renderStatistiche() {
     return d && d !== id ? id + ' · ' + d : id;
   };
 
+  // Descrizione del building di un punto carico-scarico (se manca, il nome del building)
+  const bDesc = ubId => {
+    const b = bMap[ubMap[ubId]?.buildingId]; if (!b) return '';
+    return (b.descrizione || b.nome || '').trim();
+  };
+
   const base = st.missioni.filter(m => m.stato !== 'annullata');
 
   // Menu a tendina riempiti con i valori presenti, mantenendo la scelta
@@ -335,7 +341,7 @@ export function renderStatistiche() {
 
   // ── 4. Missioni per Punto carico-scarico ──
   const P = sezione({ bp: lPBp });
-  const pRes = conta(punti, (k, m) => ubMap[k]?.nome || (k === m.origineId ? m.origineNome : m.destinazioneNome) || k, P.M);
+  const pRes = conta(punti, (k, m) => (ubMap[k]?.nome || (k === m.origineId ? m.origineNome : m.destinazioneNome) || k) + (bDesc(k) ? ' · ' + bDesc(k) : ''), P.M);
   P.M.forEach(m => {
     if (m.origineId && pRes[m.origineId]) pRes[m.origineId].da++;
     if (m.destinazioneId && pRes[m.destinazioneId]) pRes[m.destinazioneId].a++;
