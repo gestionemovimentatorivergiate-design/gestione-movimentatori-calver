@@ -155,72 +155,195 @@ function _azBadge(a) {
 }
 
 // ── STATISTICHE ──────────────────────────────────────────────────────────────
+// Tutto calcolato sulle missioni (non sullo storico, che è limitato alle ultime
+// voci). Le missioni ANNULLATE sono sempre escluse. Il periodo (Dal/Al) filtra
+// per data di creazione, tranne la tabella "Consegne per operatore e giorno",
+// che usa la data di consegna.
+const _gg = ms => ms ? new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }) : '';   // aaaa-mm-gg
+const _ggIt = s => s ? s.split('-').reverse().join('/') : '';
+
 export function renderStatistiche() {
   const st = _getState();
   const cards = document.getElementById('stat-cards');
   if (!cards) return;
 
-  const missAttive = st.missioni.filter(m => m.stato === 'richiesta' || m.stato === 'in_transito').length;
-  const consegnate = st.missioni.filter(m => m.stato === 'consegnata').length;
+  const ubMap = {}; st.ubicazioni.forEach(u => { ubMap[u.id] = u; });
+  const bMap = {};  st.buildings.forEach(b => { bMap[b.id] = b; });
+  const bLabel = id => bMap[id] ? (id + (bMap[id].nome && bMap[id].nome !== id ? ' · ' + bMap[id].nome : '')) : id;
 
-  // Durata media: creazione missione → consegna
-  const avgPieni = _durataMedia(st.missioni.filter(m => m.consegnataAt), 'createdAt', 'consegnataAt');
+  const base = st.missioni.filter(m => m.stato !== 'annullata');
 
+  // Menu a tendina riempiti con i valori presenti, mantenendo la scelta
+  const fillSel = (id, html, valide) => {
+    const sel = document.getElementById(id); if (!sel) return '';
+    const cur = sel.value;
+    sel.innerHTML = html;
+    if (valide.includes(cur)) sel.value = cur;
+    return sel.value;
+  };
+  const opts = (vals, tutti) => `<option value="">${tutti}</option>` +
+    [...new Set(vals.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'it', { numeric: true }))
+      .map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  const ops = base.map(m => m.navettaNome);
+  const els = base.map(m => m.elementoCodice);
+  const fOp = fillSel('ss-op', opts(ops, 'Tutti'), ops);
+  const fEl = fillSel('ss-elemento', opts(els, 'Tutti'), els);
+  const bpVals = st.buildings.map(b => 'b:' + b.id).concat(st.ubicazioni.map(u => 'u:' + u.id));
+  const bpHtml = '<option value="">Tutti</option>'
+    + '<optgroup label="Building">' + st.buildings.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), 'it', { numeric: true }))
+        .map(b => `<option value="b:${esc(b.id)}">${esc(bLabel(b.id))}</option>`).join('') + '</optgroup>'
+    + '<optgroup label="Punti carico-scarico">' + st.ubicazioni.slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }))
+        .map(u => `<option value="u:${esc(u.id)}">${esc(u.nome)}</option>`).join('') + '</optgroup>';
+  const fBp = fillSel('ss-bp', bpHtml, bpVals);
+  const fDa = document.getElementById('ss-da')?.value || '';
+  const fA  = document.getElementById('ss-a')?.value || '';
+
+  // Building e punti toccati da una missione (origine e/o destinazione)
+  const punti = m => [...new Set([m.origineId, m.destinazioneId].filter(Boolean))];
+  const bldgs = m => [...new Set([m.origineId, m.destinazioneId].map(i => ubMap[i]?.buildingId).filter(Boolean))];
+  const okBase = m =>
+    (!fOp || m.navettaNome === fOp) &&
+    (!fEl || m.elementoCodice === fEl) &&
+    (!fBp || (fBp[0] === 'b' ? bldgs(m).includes(fBp.slice(2)) : punti(m).includes(fBp.slice(2))));
+  const inRange = ms => {
+    if (!fDa && !fA) return true;
+    const g = _gg(ms); if (!g) return false;
+    return (!fDa || g >= fDa) && (!fA || g <= fA);
+  };
+
+  const M = base.filter(m => okBase(m) && inRange(tsVal(m.createdAt)));
+
+  // ── Riepilogo ──
+  const diff = (m, a, b) => { const s = tsVal(m[a]), e = tsVal(m[b]); return (s && e && e >= s) ? e - s : null; };
+  const media = (arr, a, b) => {
+    const v = arr.map(m => diff(m, a, b)).filter(x => x != null);
+    return { n: v.length, ms: v.length ? v.reduce((x, y) => x + y, 0) / v.length : null };
+  };
+  const t1 = media(M, 'createdAt', 'presaInCaricoAt');
+  const t2 = media(M, 'presaInCaricoAt', 'consegnataAt');
+  const t3 = media(M, 'createdAt', 'consegnataAt');
+  const completate = M.filter(m => m.stato === 'consegnata').length;
+  const inCorso = M.filter(m => m.stato === 'richiesta' || m.stato === 'in_transito').length;
   cards.innerHTML = `
-    <div class="statCard orange"><div class="val">${missAttive}</div><div class="lbl">Missioni in corso</div></div>
-    <div class="statCard green"><div class="val">${consegnate}</div><div class="lbl">Consegne totali</div></div>
-    <div class="statCard blue"><div class="val">${_fmtDurMs(avgPieni)}</div><div class="lbl">Durata media consegna</div></div>`;
+    <div class="statCard blue"><div class="val">${M.length}</div><div class="lbl">Missioni</div></div>
+    <div class="statCard green"><div class="val">${completate}</div><div class="lbl">Completate</div></div>
+    <div class="statCard orange"><div class="val">${inCorso}</div><div class="lbl">In corso</div></div>
+    <div class="statCard violet"><div class="val">${_fmtDurMs(t3.ms)}</div><div class="lbl">Tempo medio totale</div></div>`;
 
-  // Top elementi (per numero di missioni create)
-  const cntEl = {};
-  st.missioni.forEach(m => { cntEl[m.elementoCodice] = (cntEl[m.elementoCodice] || 0) + 1; });
-  _renderBar('stat-topElementi', cntEl);
+  // ── 1. Tempi medi (grafico a barre) ──
+  const chart = document.getElementById('stat-tempi');
+  if (chart) {
+    const barre = [
+      { lbl: 'Creata → Presa in carico', t: t1, col: 'var(--orange)' },
+      { lbl: 'Presa in carico → Consegna', t: t2, col: 'var(--accent2)' },
+    ];
+    const max = Math.max(...barre.map(b => b.t.ms || 0), 1);
+    const titolo = document.getElementById('stat-tempi-sub');
+    if (titolo) titolo.textContent = fOp ? 'Operatore: ' + fOp : 'Tutti gli operatori';
+    chart.innerHTML = `<div style="display:flex;gap:28px;justify-content:center;align-items:flex-end;height:210px;padding:0 8px">` +
+      barre.map(b => {
+        const h = b.t.ms == null ? 0 : Math.max(4, b.t.ms / max * 150);
+        return `<div style="flex:1;max-width:190px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:800;color:var(--text);margin-bottom:4px">${_fmtDurMs(b.t.ms)}</div>
+          <div style="width:100%;height:${h}px;background:${b.col};border-radius:8px 8px 0 0;transition:height .3s"></div>
+        </div>`;
+      }).join('') + `</div>
+      <div style="display:flex;gap:28px;justify-content:center;padding:0 8px;border-top:2px solid var(--border)">` +
+      barre.map(b => `<div style="flex:1;max-width:190px;text-align:center;padding-top:6px">
+          <div style="font-size:12px;font-weight:700;color:var(--text)">${b.lbl}</div>
+          <div style="font-size:11px;color:var(--muted)">su ${b.t.n} missioni</div></div>`).join('') + `</div>`;
+  }
 
-  // Attività per ubicazione (origine + destinazione delle missioni)
-  const cntUb = {};
-  st.missioni.forEach(m => {
-    cntUb[m.origineNome] = (cntUb[m.origineNome] || 0) + 1;
-    cntUb[m.destinazioneNome] = (cntUb[m.destinazioneNome] || 0) + 1;
+  // ── 2. Consegne per operatore e giorno (data di consegna) ──
+  const dayEl = document.getElementById('stat-giorni');
+  if (dayEl) {
+    const C = base.filter(m => m.stato === 'consegnata' && m.consegnataAt && okBase(m) && inRange(tsVal(m.consegnataAt)));
+    const cnt = {}, opSet = new Set();
+    C.forEach(m => {
+      const g = _gg(tsVal(m.consegnataAt)), o = m.navettaNome || '—';
+      opSet.add(o);
+      (cnt[g] = cnt[g] || {})[o] = (cnt[g][o] || 0) + 1;
+    });
+    let giorni = Object.keys(cnt).sort().reverse();
+    const MAXG = 31, troncato = giorni.length > MAXG && !fDa && !fA;
+    if (troncato) giorni = giorni.slice(0, MAXG);
+    const colonne = [...opSet].sort((a, b) => a.localeCompare(b, 'it'));
+    if (!giorni.length) {
+      dayEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px 2px">Nessuna consegna nel periodo selezionato.</div>';
+    } else {
+      const tot = {}; colonne.forEach(c => { tot[c] = 0; });
+      const righe = giorni.map(g => {
+        let rt = 0;
+        const tds = colonne.map(c => { const n = cnt[g][c] || 0; rt += n; tot[c] += n; return `<td style="text-align:center">${n ? '<b>' + n + '</b>' : '<span style="color:var(--muted)">·</span>'}</td>`; }).join('');
+        return `<tr><td style="white-space:nowrap">${_ggIt(g)}</td>${tds}<td style="text-align:center;font-weight:800">${rt}</td></tr>`;
+      }).join('');
+      const totTot = colonne.reduce((a, c) => a + tot[c], 0);
+      dayEl.innerHTML = `<div class="tableWrap"><table>
+        <thead><tr><th>Giorno</th>${colonne.map(c => `<th style="text-align:center">${esc(c)}</th>`).join('')}<th style="text-align:center">Totale</th></tr></thead>
+        <tbody>${righe}
+        <tr style="background:var(--surface2)"><td><b>Totale</b></td>${colonne.map(c => `<td style="text-align:center"><b>${tot[c]}</b></td>`).join('')}<td style="text-align:center;font-weight:800">${totTot}</td></tr></tbody>
+      </table></div>` + (troncato ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">Mostrati gli ultimi ${MAXG} giorni con consegne: usa Dal/Al per vedere altri periodi.</div>` : '');
+    }
+  }
+
+  // ── 3. Missioni per Building e per Punto carico-scarico ──
+  const conta = (chiavi, nome) => {
+    const r = {};
+    M.forEach(m => {
+      const set = chiavi(m);
+      set.forEach(k => {
+        const e = (r[k] = r[k] || { nome: nome(k, m), tot: 0, da: 0, a: 0 });
+        e.tot++;
+      });
+    });
+    return r;
+  };
+  const bRes = conta(bldgs, k => bLabel(k));
+  M.forEach(m => {
+    const bo = ubMap[m.origineId]?.buildingId, bd = ubMap[m.destinazioneId]?.buildingId;
+    if (bo && bRes[bo]) bRes[bo].da++;
+    if (bd && bRes[bd]) bRes[bd].a++;
   });
-  _renderBar('stat-topUbic', cntUb);
+  const pRes = conta(punti, (k, m) => ubMap[k]?.nome || (k === m.origineId ? m.origineNome : m.destinazioneNome) || k);
+  M.forEach(m => {
+    if (m.origineId && pRes[m.origineId]) pRes[m.origineId].da++;
+    if (m.destinazioneId && pRes[m.destinazioneId]) pRes[m.destinazioneId].a++;
+  });
+  const tabella = (res, selKey) => {
+    let rows = Object.entries(res);
+    if (selKey) rows = rows.filter(([k]) => k === selKey);
+    rows.sort((x, y) => y[1].tot - x[1].tot || x[1].nome.localeCompare(y[1].nome, 'it', { numeric: true }));
+    if (!rows.length) return '<div style="color:var(--muted);font-size:13px;padding:10px 2px">Nessun dato</div>';
+    const max = rows[0][1].tot || 1;
+    return `<div class="tableWrap"><table>
+      <thead><tr><th>Nome</th><th style="text-align:center">Missioni</th><th style="text-align:center">Partenze</th><th style="text-align:center">Arrivi</th></tr></thead>
+      <tbody>${rows.map(([, e]) => `<tr><td>${esc(e.nome)}</td>
+        <td style="min-width:130px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${e.tot / max * 100}%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div><b>${e.tot}</b></div></td>
+        <td style="text-align:center">${e.da}</td><td style="text-align:center">${e.a}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+  };
+  const bEl = document.getElementById('stat-building');
+  if (bEl) bEl.innerHTML = tabella(bRes, fBp[0] === 'b' ? fBp.slice(2) : '');
+  const pEl = document.getElementById('stat-punti');
+  if (pEl) pEl.innerHTML = tabella(pRes, fBp[0] === 'u' ? fBp.slice(2) : '');
 }
 
-// Media (in ms) della differenza tra due timestamp su una lista di documenti.
-// Ignora i record senza entrambi i tempi o con durata negativa. null se vuoto.
-function _durataMedia(arr, startField, endField) {
-  const durate = arr.map(x => {
-    const s = tsVal(x[startField]);
-    const e = tsVal(x[endField]);
-    return (s && e && e >= s) ? (e - s) : null;
-  }).filter(v => v != null);
-  if (!durate.length) return null;
-  return durate.reduce((a, b) => a + b, 0) / durate.length;
-}
+window.renderStatistiche = renderStatistiche;
+window.resetFiltriStat = function () {
+  ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  renderStatistiche();
+};
 
-// Formatta una durata in millisecondi in forma leggibile (min / h / g).
+// Formatta una durata in millisecondi (s / min / h / g).
 function _fmtDurMs(ms) {
   if (ms == null) return '—';
-  const totMin = Math.round(ms / 60000);
-  if (totMin < 1) return '<1 min';
-  if (totMin < 60) return totMin + ' min';
-  const h = Math.floor(totMin / 60);
-  const m = totMin % 60;
-  if (h < 24) return h + 'h ' + m + 'min';
-  const d = Math.floor(h / 24);
-  return d + 'g ' + (h % 24) + 'h';
-}
-
-function _renderBar(elId, counts) {
-  const el = document.getElementById(elId);
-  if (!el) return;
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const max = top[0]?.[1] || 1;
-  el.innerHTML = top.length ? top.map(([label, n]) => `
-    <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
-      <div style="width:110px;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}</div>
-      <div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${n / max * 100}%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div>
-      <div style="width:32px;text-align:right;font-size:12px;color:var(--muted)">${n}</div>
-    </div>`).join('') : '<div style="color:var(--muted);font-size:13px">Nessun dato</div>';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + ' s';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : '');
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ' + (m % 60) + 'min';
+  return Math.floor(h / 24) + 'g ' + (h % 24) + 'h';
 }
 
 // ── UTENTI (solo amministratore) ─────────────────────────────────────────────
