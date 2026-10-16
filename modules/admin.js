@@ -195,6 +195,7 @@ export function renderStatistiche() {
     + '<optgroup label="Punti carico-scarico">' + st.ubicazioni.slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }))
         .map(u => `<option value="u:${esc(u.id)}">${esc(u.nome)}</option>`).join('') + '</optgroup>';
   const fBp = fillSel('ss-bp', bpHtml, bpVals);
+  const fTipo = document.getElementById('ss-tipo')?.value || '';
   const fDa = document.getElementById('ss-da')?.value || '';
   const fA  = document.getElementById('ss-a')?.value || '';
 
@@ -204,6 +205,7 @@ export function renderStatistiche() {
   const okBase = m =>
     (!fOp || m.navettaNome === fOp) &&
     (!fEl || m.elementoCodice === fEl) &&
+    (!fTipo || !!m[fTipo]) &&
     (!fBp || (fBp[0] === 'b' ? bldgs(m).includes(fBp.slice(2)) : punti(m).includes(fBp.slice(2))));
   const inRange = ms => {
     if (!fDa && !fA) return true;
@@ -230,60 +232,59 @@ export function renderStatistiche() {
     <div class="statCard orange"><div class="val">${inCorso}</div><div class="lbl">In corso</div></div>
     <div class="statCard violet"><div class="val">${_fmtDurMs(t3.ms)}</div><div class="lbl">Tempo medio totale</div></div>`;
 
-  // ── 1. Tempi medi (grafico a barre) ──
-  const chart = document.getElementById('stat-tempi');
-  if (chart) {
+  const tabella = (res, selKey, semplice) => {
+    let rows = Object.entries(res);
+    if (selKey) rows = rows.filter(([k]) => k === selKey);
+    rows.sort((x, y) => y[1].tot - x[1].tot || x[1].nome.localeCompare(y[1].nome, 'it', { numeric: true }));
+    if (!rows.length) return '<div style="color:var(--muted);font-size:13px;padding:10px 2px">Nessuna consegna nel periodo selezionato.</div>';
+    const max = rows[0][1].tot || 1;
+    return `<div class="tableWrap"><table>
+      <thead><tr><th>Nome</th><th>Missioni</th>${semplice ? '' : '<th style="text-align:center">Partenze</th><th style="text-align:center">Arrivi</th>'}</tr></thead>
+      <tbody>${rows.map(([, e]) => `<tr><td>${esc(e.nome)}</td>
+        <td style="min-width:130px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${e.tot / max * 100}%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div><b>${e.tot}</b></div></td>
+        ${semplice ? '' : `<td style="text-align:center">${e.da}</td><td style="text-align:center">${e.a}</td>`}</tr>`).join('')}</tbody>
+    </table></div>`;
+  };
+  // ── 1. Tempi medi (3 grafici a barre affiancati: tutte / solo Blu / solo Rosse) ──
+  const sub = document.getElementById('stat-tempi-sub');
+  if (sub) sub.textContent = fOp ? 'Operatore: ' + fOp : 'Tutti gli operatori';
+  const grafico = (elId, titolo, colTit, arr) => {
+    const el = document.getElementById(elId); if (!el) return;
+    const a1 = media(arr, 'createdAt', 'presaInCaricoAt'), a2 = media(arr, 'presaInCaricoAt', 'consegnataAt');
     const barre = [
-      { lbl: 'Creata → Presa in carico', t: t1, col: 'var(--orange)' },
-      { lbl: 'Presa in carico → Consegna', t: t2, col: 'var(--accent2)' },
+      { lbl: 'Creata → Presa', t: a1, col: 'var(--orange)' },
+      { lbl: 'Presa → Consegna', t: a2, col: 'var(--accent2)' },
     ];
-    const max = Math.max(...barre.map(b => b.t.ms || 0), 1);
-    const titolo = document.getElementById('stat-tempi-sub');
-    if (titolo) titolo.textContent = fOp ? 'Operatore: ' + fOp : 'Tutti gli operatori';
-    chart.innerHTML = `<div style="display:flex;gap:28px;justify-content:center;align-items:flex-end;height:210px;padding:0 8px">` +
-      barre.map(b => {
-        const h = b.t.ms == null ? 0 : Math.max(4, b.t.ms / max * 150);
-        return `<div style="flex:1;max-width:190px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:800;color:var(--text);margin-bottom:4px">${_fmtDurMs(b.t.ms)}</div>
-          <div style="width:100%;height:${h}px;background:${b.col};border-radius:8px 8px 0 0;transition:height .3s"></div>
-        </div>`;
+    const max = Math.max(...barre.map(x => x.t.ms || 0), 1);
+    el.innerHTML = `<div style="text-align:center;font-weight:800;font-size:13px;color:${colTit};margin-bottom:6px">${titolo} <span style="color:var(--muted);font-weight:600">(${arr.length})</span></div>
+      <div style="display:flex;gap:12px;align-items:flex-end;height:150px">` +
+      barre.map(x => {
+        const h = x.t.ms == null ? 0 : Math.max(4, x.t.ms / max * 80);
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;color:var(--text);margin-bottom:3px;text-align:center;line-height:1.1">${_fmtDurMs(x.t.ms)}</div>
+          <div style="width:100%;max-width:56px;height:${h}px;background:${x.col};border-radius:6px 6px 0 0;transition:height .3s"></div></div>`;
       }).join('') + `</div>
-      <div style="display:flex;gap:28px;justify-content:center;padding:0 8px;border-top:2px solid var(--border)">` +
-      barre.map(b => `<div style="flex:1;max-width:190px;text-align:center;padding-top:6px">
-          <div style="font-size:12px;font-weight:700;color:var(--text)">${b.lbl}</div>
-          <div style="font-size:11px;color:var(--muted)">su ${b.t.n} missioni</div></div>`).join('') + `</div>`;
-  }
+      <div style="display:flex;gap:12px;border-top:2px solid var(--border)">` +
+      barre.map(x => `<div style="flex:1;text-align:center;padding-top:5px"><div style="font-size:11px;font-weight:700">${x.lbl}</div>
+        <div style="font-size:10px;color:var(--muted)">su ${x.t.n} ${x.t.n === 1 ? 'missione' : 'missioni'}</div></div>`).join('') + `</div>`;
+  };
+  grafico('stat-tempi-all', 'Tutte', 'var(--text)', M);
+  grafico('stat-tempi-blu', '🔵 Linea Blu', '#2563eb', M.filter(m => m.lineaBlu));
+  grafico('stat-tempi-rossa', '🔴 Linea Rossa', '#dc2626', M.filter(m => m.lineaRossa));
 
-  // ── 2. Consegne per operatore e giorno (data di consegna) ──
+  // ── 2. Consegne per operatore nel giorno (default: oggi) ──
   const dayEl = document.getElementById('stat-giorni');
   if (dayEl) {
-    const C = base.filter(m => m.stato === 'consegnata' && m.consegnataAt && okBase(m) && inRange(tsVal(m.consegnataAt)));
-    const cnt = {}, opSet = new Set();
-    C.forEach(m => {
-      const g = _gg(tsVal(m.consegnataAt)), o = m.navettaNome || '—';
-      opSet.add(o);
-      (cnt[g] = cnt[g] || {})[o] = (cnt[g][o] || 0) + 1;
-    });
-    let giorni = Object.keys(cnt).sort().reverse();
-    const MAXG = 31, troncato = giorni.length > MAXG && !fDa && !fA;
-    if (troncato) giorni = giorni.slice(0, MAXG);
-    const colonne = [...opSet].sort((a, b) => a.localeCompare(b, 'it'));
-    if (!giorni.length) {
-      dayEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px 2px">Nessuna consegna nel periodo selezionato.</div>';
-    } else {
-      const tot = {}; colonne.forEach(c => { tot[c] = 0; });
-      const righe = giorni.map(g => {
-        let rt = 0;
-        const tds = colonne.map(c => { const n = cnt[g][c] || 0; rt += n; tot[c] += n; return `<td style="text-align:center">${n ? '<b>' + n + '</b>' : '<span style="color:var(--muted)">·</span>'}</td>`; }).join('');
-        return `<tr><td style="white-space:nowrap">${_ggIt(g)}</td>${tds}<td style="text-align:center;font-weight:800">${rt}</td></tr>`;
-      }).join('');
-      const totTot = colonne.reduce((a, c) => a + tot[c], 0);
-      dayEl.innerHTML = `<div class="tableWrap"><table>
-        <thead><tr><th>Giorno</th>${colonne.map(c => `<th style="text-align:center">${esc(c)}</th>`).join('')}<th style="text-align:center">Totale</th></tr></thead>
-        <tbody>${righe}
-        <tr style="background:var(--surface2)"><td><b>Totale</b></td>${colonne.map(c => `<td style="text-align:center"><b>${tot[c]}</b></td>`).join('')}<td style="text-align:center;font-weight:800">${totTot}</td></tr></tbody>
-      </table></div>` + (troncato ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">Mostrati gli ultimi ${MAXG} giorni con consegne: usa Dal/Al per vedere altri periodi.</div>` : '');
-    }
+    const oggi = _gg(Date.now());
+    const dal = fDa || (fA ? '' : oggi), al = fA || (fDa ? '' : oggi);
+    const ok = ms => { const g = _gg(ms); return !!g && (!dal || g >= dal) && (!al || g <= al); };
+    const C = base.filter(m => m.stato === 'consegnata' && m.consegnataAt && okBase(m) && ok(tsVal(m.consegnataAt)));
+    const res = {};
+    C.forEach(m => { const o = m.navettaNome || '—'; (res[o] = res[o] || { nome: o, tot: 0 }).tot++; });
+    const subG = document.getElementById('stat-giorni-sub');
+    if (subG) subG.textContent = dal && dal === al ? (dal === oggi ? 'Oggi · ' : '') + _ggIt(dal)
+      : 'Dal ' + (_ggIt(dal) || 'inizio') + ' al ' + (_ggIt(al) || 'oggi');
+    dayEl.innerHTML = tabella(res, '', true) + (C.length ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">Totale consegne: <b>${C.length}</b></div>` : '');
   }
 
   // ── 3. Missioni per Building e per Punto carico-scarico ──
@@ -309,19 +310,6 @@ export function renderStatistiche() {
     if (m.origineId && pRes[m.origineId]) pRes[m.origineId].da++;
     if (m.destinazioneId && pRes[m.destinazioneId]) pRes[m.destinazioneId].a++;
   });
-  const tabella = (res, selKey) => {
-    let rows = Object.entries(res);
-    if (selKey) rows = rows.filter(([k]) => k === selKey);
-    rows.sort((x, y) => y[1].tot - x[1].tot || x[1].nome.localeCompare(y[1].nome, 'it', { numeric: true }));
-    if (!rows.length) return '<div style="color:var(--muted);font-size:13px;padding:10px 2px">Nessun dato</div>';
-    const max = rows[0][1].tot || 1;
-    return `<div class="tableWrap"><table>
-      <thead><tr><th>Nome</th><th style="text-align:center">Missioni</th><th style="text-align:center">Partenze</th><th style="text-align:center">Arrivi</th></tr></thead>
-      <tbody>${rows.map(([, e]) => `<tr><td>${esc(e.nome)}</td>
-        <td style="min-width:130px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${e.tot / max * 100}%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div><b>${e.tot}</b></div></td>
-        <td style="text-align:center">${e.da}</td><td style="text-align:center">${e.a}</td></tr>`).join('')}</tbody>
-    </table></div>`;
-  };
   const bEl = document.getElementById('stat-building');
   if (bEl) bEl.innerHTML = tabella(bRes, fBp[0] === 'b' ? fBp.slice(2) : '');
   const pEl = document.getElementById('stat-punti');
@@ -330,7 +318,7 @@ export function renderStatistiche() {
 
 window.renderStatistiche = renderStatistiche;
 window.resetFiltriStat = function () {
-  ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp', 'ss-tipo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   renderStatistiche();
 };
 
