@@ -141,6 +141,11 @@
   <div class="page" id="pageInCorso">
     <div class="pageHeader">In corso</div>
     <div class="pageSubtitle">Prendi in carico dalla coda e conferma all'arrivo</div>
+    <div class="filterBar" style="align-items:flex-end;margin-bottom:10px">
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Area di movimentazione</div>
+        <select id="ic-area" onchange="cambiaAreaInCorso()" style="min-width:220px"><option value="">Tutte le aree</option></select></div>
+    </div>
+    <div class="pageSubtitle" id="ic-nascoste" style="margin-top:-2px"></div>
     <div class="statsRow" id="incorso-stats"></div>
     <div id="incorso-list"><div class="emptyState">Caricamento…</div></div>
   </div>
@@ -218,7 +223,7 @@
   <!-- ── PAGINA: ANAGRAFICHE (amministratore) ────────────────────────────────── -->
   <div class="page" id="pageAnagrafiche">
     <div class="pageHeader">Anagrafiche</div>
-    <div class="pageSubtitle">Elementi, building e punti carico-scarico — modificabili in qualsiasi momento</div>
+    <div class="pageSubtitle">Elementi, building, punti carico-scarico e aree di movimentazione — modificabili in qualsiasi momento</div>
 
     <div class="card">
       <div class="cardTitle">Elementi</div>
@@ -250,6 +255,16 @@
         <button class="btnGreen btnSmall" onclick="addUbicazione()">+ Aggiungi</button>
       </div>
       <div id="ub-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="cardTitle">Aree di movimentazione</div>
+      <div class="field" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <input type="text" id="ar-nome" placeholder="Nome area di movimentazione" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')addArea()">
+        <button class="btnGreen btnSmall" onclick="addArea()">+ Aggiungi</button>
+      </div>
+      <div class="field"><label>Punti carico-scarico dell'area (uno o più)</label><div id="ar-checks"></div></div>
+      <div id="ar-list"></div>
     </div>
   </div>
 

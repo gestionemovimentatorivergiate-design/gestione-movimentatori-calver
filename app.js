@@ -20,7 +20,7 @@ import {
 import { showToast } from './shared-utils.js';
 import { initOperativo, renderNuovaMissione, renderMieMissioni } from './modules/operativo.js';
 import { initNavetta, renderInCorso } from './modules/navetta.js';
-import { initAnagrafiche, renderElementi, renderUbicazioni, renderBuildings } from './modules/anagrafiche.js';
+import { initAnagrafiche, renderElementi, renderUbicazioni, renderBuildings, renderAree } from './modules/anagrafiche.js';
 import { initAdmin, renderStorico, renderStatistiche, renderUtenti } from './modules/admin.js';
 
 // ── STATO CONDIVISO ─────────────────────────────────────────────────────────
@@ -32,6 +32,7 @@ const state = {
   elementi: [],
   buildings: [],
   ubicazioni: [],
+  aree: [],
   history: [],
   historyLimit: HISTORY_LIMIT,
   utenti: [],
@@ -64,7 +65,7 @@ function refreshCurrentPage() {
     case 'InCorso':       renderInCorso();       break;
     case 'Storico':       renderStorico();       break;
     case 'Statistiche':   renderStatistiche();   break;
-    case 'Anagrafiche':   renderElementi(); renderBuildings(); renderUbicazioni(); break;
+    case 'Anagrafiche':   renderElementi(); renderBuildings(); renderUbicazioni(); renderAree(); break;
     case 'Utenti':        renderUtenti();        break;
   }
 }
@@ -98,8 +99,10 @@ function startListeners() {
       // I Building sono salvati nella stessa collezione (tipo: 'building'):
       // qui vengono separati dalle ubicazioni vere (magazzino / linea).
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Anche le Aree di movimentazione (tipo: 'area') vivono in questa collezione.
       state.buildings  = all.filter(x => x.tipo === 'building');
-      state.ubicazioni = all.filter(x => x.tipo !== 'building');
+      state.aree       = all.filter(x => x.tipo === 'area');
+      state.ubicazioni = all.filter(x => x.tipo !== 'building' && x.tipo !== 'area');
       refreshCurrentPage();
     },
     err => console.error('Errore ubicazioni:', err)));
