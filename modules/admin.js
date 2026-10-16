@@ -290,22 +290,23 @@ export function renderStatistiche() {
   if (sub) sub.textContent = T.f.op ? 'Operatore: ' + T.f.op : 'Tutti gli operatori';
   const grafico = (elId, titolo, colTit, arr) => {
     const el = document.getElementById(elId); if (!el) return;
-    const a1 = media(arr, 'createdAt', 'presaInCaricoAt'), a2 = media(arr, 'presaInCaricoAt', 'consegnataAt');
+    const a1 = media(arr, 'createdAt', 'presaInCaricoAt'), a2 = media(arr, 'presaInCaricoAt', 'consegnataAt'), a3 = media(arr, 'createdAt', 'consegnataAt');
     const barre = [
       { lbl: 'Creata → Presa', t: a1, col: 'var(--orange)' },
       { lbl: 'Presa → Consegna', t: a2, col: 'var(--accent2)' },
+      { lbl: 'Creata → Consegna', t: a3, col: 'var(--violet)' },
     ];
     const max = Math.max(...barre.map(x => x.t.ms || 0), 1);
     el.innerHTML = `<div style="text-align:center;font-weight:800;font-size:13px;color:${colTit};margin-bottom:6px">${titolo} <span style="color:var(--muted);font-weight:600">(${arr.length})</span></div>
-      <div style="display:flex;gap:12px;align-items:flex-end;height:150px">` +
+      <div style="display:flex;gap:8px;align-items:flex-end;height:150px">` +
       barre.map(x => {
         const h = x.t.ms == null ? 0 : Math.max(4, x.t.ms / max * 80);
         return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;color:var(--text);margin-bottom:3px;text-align:center;line-height:1.1">${_fmtDurMs(x.t.ms)}</div>
-          <div style="width:100%;max-width:56px;height:${h}px;background:${x.col};border-radius:6px 6px 0 0;transition:height .3s"></div></div>`;
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:var(--text);margin-bottom:3px;text-align:center;line-height:1.1">${_fmtDurMs(x.t.ms)}</div>
+          <div style="width:100%;max-width:48px;height:${h}px;background:${x.col};border-radius:6px 6px 0 0;transition:height .3s"></div></div>`;
       }).join('') + `</div>
-      <div style="display:flex;gap:12px;border-top:2px solid var(--border)">` +
-      barre.map(x => `<div style="flex:1;text-align:center;padding-top:5px"><div style="font-size:11px;font-weight:700">${x.lbl}</div>
+      <div style="display:flex;gap:8px;border-top:2px solid var(--border)">` +
+      barre.map(x => `<div style="flex:1;text-align:center;padding-top:5px"><div style="font-size:10px;font-weight:700;line-height:1.2">${x.lbl}</div>
         <div style="font-size:10px;color:var(--muted)">su ${x.t.n} ${x.t.n === 1 ? 'missione' : 'missioni'}</div></div>`).join('') + `</div>`;
   };
   // Con un filtro "Tipo" attivo, restano valorizzati solo i grafici che gli corrispondono
