@@ -220,6 +220,7 @@ export function renderStatistiche() {
   const lTBp = fillSel('sl-t-bp', bpHtml, bpVals);
   const lGOp = fillSel('sl-g-op', opts(ops, 'Tutti'), ops);
   const lBBp = fillSel('sl-b-bp', '<option value="">Tutti i building</option>' + bOpts, bpVals);
+  const lPB = fillSel('sl-p-b', '<option value="">Tutti i building</option>' + bOpts.replace(/value="b:/g, 'value="'), st.buildings.map(b => b.id));
   const lPBp = fillSel('sl-p-bp', '<option value="">Tutti i punti</option>' + uOpts, bpVals);
 
   const G = { op: fOp, el: _val('ss-elemento'), tipo: _val('ss-tipo'), bp: fBp };
@@ -346,6 +347,8 @@ export function renderStatistiche() {
     if (m.origineId && pRes[m.origineId]) pRes[m.origineId].da++;
     if (m.destinazioneId && pRes[m.destinazioneId]) pRes[m.destinazioneId].a++;
   });
+  // Filtro per Building di appartenenza: restano solo i punti di quel building
+  if (lPB) Object.keys(pRes).forEach(k => { if (ubMap[k]?.buildingId !== lPB) delete pRes[k]; });
   const pEl = document.getElementById('stat-punti');
   if (pEl) pEl.innerHTML = tabella(pRes, P.f.bp[0] === 'u' ? P.f.bp.slice(2) : '');
 }
@@ -354,7 +357,7 @@ window.renderStatistiche = renderStatistiche;
 // Azzera i filtri globali e quelli di tutte le sezioni
 window.resetFiltriStat = function () {
   ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp', 'ss-tipo',
-   'sl-t-op', 'sl-t-bp', 'sl-g-da', 'sl-g-a', 'sl-g-op', 'sl-b-bp', 'sl-p-bp'
+   'sl-t-op', 'sl-t-bp', 'sl-g-da', 'sl-g-a', 'sl-g-op', 'sl-b-bp', 'sl-p-bp', 'sl-p-b'
   ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   renderStatistiche();
 };
