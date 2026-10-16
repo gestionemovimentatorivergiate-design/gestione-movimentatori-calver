@@ -298,7 +298,7 @@ function _cardMissioneAttesa(m) {
         <span class="mStatoBadge richiesta">In attesa</span>
       </div>
       <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
-      ${m.note ? `<div class="mMeta" style="color:var(--text2);font-size:13px;white-space:pre-wrap">📝 ${esc(m.note)}</div>` : ''}
+      ${m.note ? `<div class="mMeta" style="color:var(--text);font-size:16px;font-weight:600;line-height:1.4;white-space:pre-wrap;margin:4px 0">📝 ${esc(m.note)}</div>` : ''}
       <div class="mMeta">Creata: ${_dataOraSec(m.createdAt)}</div>
       <div class="mActions">
         <button class="btnGray" onclick="stampaFoglioTrasferimento('${m.id}')">🖨 Stampa foglio trasferimento</button>
