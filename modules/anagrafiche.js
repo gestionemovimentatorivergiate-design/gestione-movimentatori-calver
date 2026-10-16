@@ -1,5 +1,5 @@
 // ── modules/anagrafiche.js ────────────────────────────────────────────────────
-// CRUD di Elementi e Ubicazioni. Editabili in qualsiasi momento.
+// CRUD di Elementi, Building e Punti carico-scarico (collezione 'ubicazioni'). Editabili in qualsiasi momento.
 //
 // elementi/{id}    : { codice, descrizione, attivo, createdAt }
 // BUILDING         : salvati nella collezione ubicazioni/{ID} con tipo: 'building'
@@ -8,7 +8,7 @@
 //                    L'ID del documento è l'ID scelto dall'admin (lettere e numeri,
 //                    maiuscolo, univoco, NON modificabile dopo la creazione).
 //                    app.js li separa dalle ubicazioni vere in state.buildings.
-// ubicazioni/{id}  : { nome, buildingId, attivo, createdAt }  (nessun tipo: origine e destinazione sono libere)
+// ubicazioni/{id}  : { nome, buildingId, descrizione (facoltativa), attivo, createdAt }  [= "Punti carico-scarico"]  (nessun tipo: origine e destinazione sono libere)
 //                    buildingId → ID del Building; il nome si legge sempre da
 //                    state.buildings (non è copiato), quindi resta aggiornato.
 //
@@ -185,7 +185,7 @@ window.deleteBuilding = async function (id) {
   const b = _getState().buildings.find(x => x.id === id);
   if (!b) return;
   const usate = _getState().ubicazioni.filter(u => u.buildingId === id).length;
-  if (usate) { showToast(`Building usato da ${usate} ubicazioni: disattivalo invece di eliminarlo.`, 'error'); return; }
+  if (usate) { showToast(`Building usato da ${usate} punti carico-scarico: disattivalo invece di eliminarlo.`, 'error'); return; }
   if (!confirm(`Eliminare il building "${b.id} · ${b.nome}"?`)) return;
   try {
     await deleteDoc(doc(window.db, 'ubicazioni', id));
@@ -199,7 +199,7 @@ export function renderUbicazioni() {
   const el = document.getElementById('ub-list');
   if (!el) return;
   const list = _getState().ubicazioni;
-  if (!list.length) { el.innerHTML = '<div class="emptyState">Nessuna ubicazione. Aggiungine una sopra.</div>'; return; }
+  if (!list.length) { el.innerHTML = '<div class="emptyState">Nessun punto carico-scarico. Aggiungine uno sopra.</div>'; return; }
   const bMap = {};
   _getState().buildings.forEach(b => { bMap[b.id] = b; });
   el.innerHTML = list.map(u => {
@@ -210,10 +210,11 @@ export function renderUbicazioni() {
     return `
     <div class="rowItem ${u.attivo === false ? 'off' : ''}">
       <div class="rowMain">
-        <div class="rowTitle">${esc(u.nome)} ${u.attivo === false ? '<span class="pill off">disattivata</span>' : ''}</div>
+        <div class="rowTitle">${esc(u.nome)} ${u.attivo === false ? '<span class="pill off">disattivato</span>' : ''}</div>
         <div class="rowSub">🏢 ${bTxt}</div>
+        ${u.descrizione ? `<div class="rowSub">${esc(u.descrizione)}</div>` : ''}
       </div>
-      <button class="btnIcon" title="Rinomina" onclick="renameUbicazione('${u.id}')">✏️</button>
+      <button class="btnIcon" title="Modifica" onclick="renameUbicazione('${u.id}')">✏️</button>
       <button class="btnIcon" title="${u.attivo === false ? 'Riattiva' : 'Disattiva'}" onclick="toggleUbicazione('${u.id}',${u.attivo === false})">${u.attivo === false ? '↩️' : '🚫'}</button>
       <button class="btnIcon" title="Elimina" onclick="deleteUbicazione('${u.id}','${esc(u.nome)}')">🗑</button>
     </div>`;
@@ -225,16 +226,19 @@ window.addUbicazione = async function () {
   const nomeEl = document.getElementById('ub-nome');
   const nome = (nomeEl.value || '').trim();
   const buildingId = (document.getElementById('ub-building')?.value || '').trim();
-  if (!nome) { showToast('Inserisci il nome ubicazione.', 'error'); return; }
-  if (!buildingId) { showToast('Seleziona il Building dell\'ubicazione.', 'error'); return; }
+  const descEl = document.getElementById('ub-desc');
+  const descrizione = (descEl?.value || '').trim();
+  if (!nome) { showToast('Inserisci il nome del punto carico-scarico.', 'error'); return; }
+  if (!buildingId) { showToast('Seleziona il Building del punto carico-scarico.', 'error'); return; }
   if (!_getState().buildings.some(b => b.id === buildingId)) { showToast('Building non valido.', 'error'); return; }
   if (_getState().ubicazioni.some(u => (u.nome || '').toLowerCase() === nome.toLowerCase())) {
-    showToast('Ubicazione già esistente.', 'error'); return;
+    showToast('Punto carico-scarico già esistente.', 'error'); return;
   }
   try {
-    await addDoc(collection(window.db, 'ubicazioni'), { nome, buildingId, attivo: true, createdAt: serverTimestamp() });
+    await addDoc(collection(window.db, 'ubicazioni'), { nome, buildingId, descrizione, attivo: true, createdAt: serverTimestamp() });
     nomeEl.value = '';
-    showToast('Ubicazione aggiunta.', 'success');
+    if (descEl) descEl.value = '';
+    showToast('Punto carico-scarico aggiunto.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
 
@@ -242,16 +246,18 @@ window.renameUbicazione = async function (id) {
   if (!_requireAdmin()) return;
   const u = _getState().ubicazioni.find(x => x.id === id);
   if (!u) return;
-  const nome = prompt('Nome ubicazione:', u.nome);
+  const nome = prompt('Nome punto carico-scarico:', u.nome);
   if (nome === null || !nome.trim()) return;
   const elenco = _getState().buildings.map(b => `${b.id} = ${b.nome}`).join('\n');
   const bIn = prompt('ID Building:\n' + elenco, u.buildingId || '');
   if (bIn === null) return;
   const buildingId = bIn.trim().toUpperCase();
   if (!_getState().buildings.some(b => b.id === buildingId)) { showToast('Building non valido: usa un ID esistente.', 'error'); return; }
+  const dIn = prompt('Descrizione (facoltativa, lascia vuoto per nessuna):', u.descrizione || '');
+  if (dIn === null) return;
   try {
-    await updateDoc(doc(window.db, 'ubicazioni', id), { nome: nome.trim(), buildingId });
-    showToast('Ubicazione aggiornata.', 'success');
+    await updateDoc(doc(window.db, 'ubicazioni', id), { nome: nome.trim(), buildingId, descrizione: dIn.trim() });
+    showToast('Punto carico-scarico aggiornato.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
 
@@ -259,15 +265,15 @@ window.toggleUbicazione = async function (id, attiva) {
   if (!_requireAdmin()) return;
   try {
     await updateDoc(doc(window.db, 'ubicazioni', id), { attivo: !!attiva });
-    showToast(attiva ? 'Ubicazione riattivata.' : 'Ubicazione disattivata.', 'success');
+    showToast(attiva ? 'Punto carico-scarico riattivato.' : 'Punto carico-scarico disattivato.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
 
 window.deleteUbicazione = async function (id, nome) {
   if (!_requireAdmin()) return;
-  if (!confirm(`Eliminare l'ubicazione "${nome}"? Meglio disattivarla se ha uno storico.`)) return;
+  if (!confirm(`Eliminare il punto carico-scarico "${nome}"? Meglio disattivarlo se ha uno storico.`)) return;
   try {
     await deleteDoc(doc(window.db, 'ubicazioni', id));
-    showToast('Ubicazione eliminata.', 'success');
+    showToast('Punto carico-scarico eliminato.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
