@@ -33,13 +33,37 @@ export function renderInCorso() {
   const u = _getUser();
   const isAdmin = u.role === 'amministratore';
 
+  // Filtro "Area di movimentazione": solo le missioni con destinazione in uno dei
+  // punti dell'area. La scelta resta memorizzata su questo dispositivo.
+  const aree = (st.aree || []).filter(a => a.attivo !== false)
+    .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+  const sel = document.getElementById('ic-area');
+  let area = null;
+  if (sel) {
+    let cur = sel.value;
+    if (sel.dataset.uid !== u.uid) {            // primo disegno per questo utente: ripristina la scelta salvata
+      sel.dataset.uid = u.uid;
+      try { cur = localStorage.getItem('areaInCorso:' + u.uid) || ''; } catch (e) { cur = ''; }
+    }
+    sel.innerHTML = '<option value="">Tutte le aree</option>' + aree.map(a => `<option value="${esc(a.id)}">${esc(a.nome)}</option>`).join('');
+    sel.value = aree.some(a => a.id === cur) ? cur : '';
+    area = aree.find(a => a.id === sel.value) || null;
+  }
+  const inArea = m => !area || (area.puntiIds || []).includes(m.destinazioneId);
+
   // Da prendere
-  const avMiss = st.missioni.filter(m => m.stato === 'richiesta')
+  const avTutte = st.missioni.filter(m => m.stato === 'richiesta');
+  const avMiss = avTutte.filter(inArea)
     .map(m => ({ ...m, _kind: 'missione', _avail: true }));
 
   // Presi in carico (propri; l'admin li vede tutti)
-  const tkMiss = st.missioni.filter(m => m.stato === 'in_transito' && (isAdmin || m.navettaId === u.uid))
+  const tkTutte = st.missioni.filter(m => m.stato === 'in_transito' && (isAdmin || m.navettaId === u.uid));
+  const tkMiss = tkTutte.filter(inArea)
     .map(m => ({ ...m, _kind: 'missione', _avail: false }));
+
+  const nascoste = (avTutte.length - avMiss.length) + (tkTutte.length - tkMiss.length);
+  const nEl = document.getElementById('ic-nascoste');
+  if (nEl) nEl.textContent = area && nascoste ? `Area "${area.nome}": ${nascoste} ${nascoste === 1 ? 'missione nascosta' : 'missioni nascoste'} (destinazione fuori area)` : '';
 
   // Un'unica lista: prima le missioni LINEA BLU, poi tutto il resto; a parità
   // ordinata per anzianità. Prendere un elemento non lo sposta di posizione
@@ -56,9 +80,15 @@ export function renderInCorso() {
       <div class="statCard green"><div class="val">${tkMiss.length}</div><div class="lbl">In carico</div></div>`;
   }
 
-  if (!lista.length) { el.innerHTML = '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
+  if (!lista.length) { el.innerHTML = area ? '<div class="emptyState">Nessuna missione per quest\'area. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
   el.innerHTML = lista.map(_card).join('');
 }
+
+window.cambiaAreaInCorso = function () {
+  const u = _getUser();
+  try { localStorage.setItem('areaInCorso:' + u.uid, document.getElementById('ic-area')?.value || ''); } catch (e) {}
+  renderInCorso();
+};
 
 function _card(item) {
   let statoBadge, actionBtn, meta;

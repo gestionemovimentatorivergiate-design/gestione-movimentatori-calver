@@ -36,6 +36,7 @@ function _dialogModifica({ titolo, campi, onSave }) {
   const riga = c => {
     const lab = `<label>${esc(c.label)}</label>`;
     if (c.tipo === 'info') return `<div class="field">${lab}<div style="font-weight:700;padding:6px 0">${esc(c.valore)}</div></div>`;
+    if (c.tipo === 'checks') return `<div class="field">${lab}${_checklistHtml('ma-' + c.id, c.opzioni, c.valore || [])}</div>`;
     if (c.tipo === 'select') {
       return `<div class="field">${lab}<select id="ma-${c.id}">` +
         c.opzioni.map(o => `<option value="${esc(o.v)}"${o.v === c.valore ? ' selected' : ''}>${esc(o.t)}</option>`).join('') +
@@ -54,7 +55,7 @@ function _dialogModifica({ titolo, campi, onSave }) {
       <button class="btnGreen" id="ma-salva">Salva modifiche</button>
     </div></div>`;
   document.body.appendChild(ov);
-  const first = campi.find(c => c.tipo !== 'info');
+  const first = campi.find(c => c.tipo !== 'info' && c.tipo !== 'checks');
   if (first) document.getElementById('ma-' + first.id)?.focus();
   document.getElementById('ma-chiudi').onclick = () => ov.remove();
   ov.addEventListener('keydown', e => {
@@ -63,13 +64,38 @@ function _dialogModifica({ titolo, campi, onSave }) {
   });
   document.getElementById('ma-salva').onclick = async () => {
     const val = {};
-    campi.forEach(c => { if (c.tipo !== 'info') val[c.id] = (document.getElementById('ma-' + c.id)?.value || '').trim(); });
+    campi.forEach(c => {
+      if (c.tipo === 'info') return;
+      if (c.tipo === 'checks') val[c.id] = _checklistLeggi('ma-' + c.id, ov);
+      else val[c.id] = (document.getElementById('ma-' + c.id)?.value || '').trim();
+    });
     const btn = document.getElementById('ma-salva');
     btn.disabled = true; btn.textContent = '⏳ Salvataggio…';
     try { await onSave(val); ov.remove(); }
     catch (e) { btn.disabled = false; btn.textContent = 'Salva modifiche'; showToast(e.message || String(e), 'error'); }
   };
 }
+
+// ── Elenco a caselle con ricerca (selezione multipla) ───────────────────────
+// opzioni: [{v, t}]; selected: array di v già spuntati
+function _checklistHtml(gid, opzioni, selected) {
+  const sel = new Set(selected);
+  return `<div data-grp="${esc(gid)}">
+    <input type="text" placeholder="🔍 Cerca…" oninput="filtraChecklist(this)" style="margin-bottom:6px" spellcheck="false">
+    <div style="max-height:230px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:4px;background:var(--surface)">` +
+    (opzioni.length ? opzioni.map(o => `<label data-t="${esc(String(o.t).toLowerCase())}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:600">
+      <input type="checkbox" data-chk="${esc(gid)}" value="${esc(o.v)}"${sel.has(o.v) ? ' checked' : ''} style="width:18px;height:18px;margin:0;accent-color:var(--accent2)">
+      <span>${esc(o.t)}</span></label>`).join('')
+      : '<div style="padding:10px;color:var(--muted);font-size:13px">Nessun punto carico-scarico disponibile.</div>') +
+    `</div></div>`;
+}
+function _checklistLeggi(gid, root = document) {
+  return [...root.querySelectorAll('input[data-chk]')].filter(x => x.dataset.chk === gid && x.checked).map(x => x.value);
+}
+window.filtraChecklist = function (inp) {
+  const q = inp.value.trim().toLowerCase();
+  inp.parentElement.querySelectorAll('label[data-t]').forEach(l => { l.style.display = l.dataset.t.includes(q) ? 'flex' : 'none'; });
+};
 
 function _requireAdmin() {
   const u = _getUser();
@@ -335,5 +361,104 @@ window.deleteUbicazione = async function (id, nome) {
   try {
     await deleteDoc(doc(window.db, 'ubicazioni', id));
     showToast('Punto carico-scarico eliminato.', 'success');
+  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+};
+
+// ── AREE DI MOVIMENTAZIONE ──────────────────────────────────────────────────
+// Salvate in ubicazioni/{auto-id} con tipo: 'area' (così usano le regole già
+// esistenti, come i Building): { nome, tipo:'area', puntiIds:[id punti], attivo, createdAt }
+// Nel tab "In corso" l'utente sceglie un'area e vede solo le missioni la cui
+// destinazione è uno dei punti dell'area.
+function _opzioniPunti(includiIds = []) {
+  const st = _getState();
+  return st.ubicazioni.filter(u => u.attivo !== false || includiIds.includes(u.id))
+    .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }))
+    .map(u => ({ v: u.id, t: u.nome + (u.buildingId ? '  ·  ' + u.buildingId : '') }));
+}
+
+export function renderAree() {
+  const st = _getState();
+  // Elenco punti del form "nuova area": ridisegnato mantenendo le spunte e la ricerca
+  const box = document.getElementById('ar-checks');
+  if (box) {
+    const spunte = _checklistLeggi('ar-new', box);
+    const q = box.querySelector('input[type=text]')?.value || '';
+    box.innerHTML = _checklistHtml('ar-new', _opzioniPunti(), spunte);
+    const inp = box.querySelector('input[type=text]');
+    if (inp && q) { inp.value = q; window.filtraChecklist(inp); }
+  }
+  const el = document.getElementById('ar-list');
+  if (!el) return;
+  const list = [...st.aree].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+  if (!list.length) { el.innerHTML = '<div class="emptyState">Nessuna area di movimentazione. Creane una sopra.</div>'; return; }
+  const uMap = {}; st.ubicazioni.forEach(u => { uMap[u.id] = u; });
+  el.innerHTML = list.map(a => {
+    const nomi = (a.puntiIds || []).map(i => uMap[i]?.nome).filter(Boolean);
+    const txt = nomi.slice(0, 6).join(', ') + (nomi.length > 6 ? ` … (+${nomi.length - 6})` : '');
+    return `
+    <div class="rowItem ${a.attivo === false ? 'off' : ''}">
+      <div class="rowMain">
+        <div class="rowTitle">${esc(a.nome)} ${a.attivo === false ? '<span class="pill off">disattivata</span>' : ''}</div>
+        <div class="rowSub">📍 ${nomi.length} ${nomi.length === 1 ? 'punto' : 'punti'}${txt ? ': ' + esc(txt) : ''}</div>
+      </div>
+      <button class="btnIcon" title="Modifica" onclick="renameArea('${esc(a.id)}')">✏️</button>
+      <button class="btnIcon" title="${a.attivo === false ? 'Riattiva' : 'Disattiva'}" onclick="toggleArea('${esc(a.id)}',${a.attivo === false})">${a.attivo === false ? '↩️' : '🚫'}</button>
+      <button class="btnIcon" title="Elimina" onclick="deleteArea('${esc(a.id)}')">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+window.addArea = async function () {
+  if (!_requireAdmin()) return;
+  const nomeEl = document.getElementById('ar-nome');
+  const nome = (nomeEl.value || '').trim();
+  const puntiIds = _checklistLeggi('ar-new', document.getElementById('ar-checks'));
+  if (!nome) { showToast('Inserisci il nome dell\'area di movimentazione.', 'error'); return; }
+  if (!puntiIds.length) { showToast('Seleziona almeno un punto carico-scarico.', 'error'); return; }
+  if (_getState().aree.some(a => (a.nome || '').toLowerCase() === nome.toLowerCase())) { showToast('Area già esistente.', 'error'); return; }
+  try {
+    await addDoc(collection(window.db, 'ubicazioni'), { nome, tipo: 'area', puntiIds, attivo: true, createdAt: serverTimestamp() });
+    nomeEl.value = '';
+    document.querySelectorAll('#ar-checks input[data-chk]').forEach(c => { c.checked = false; });
+    showToast('Area di movimentazione aggiunta.', 'success');
+  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+};
+
+window.renameArea = function (id) {
+  if (!_requireAdmin()) return;
+  const a = _getState().aree.find(x => x.id === id);
+  if (!a) return;
+  _dialogModifica({
+    titolo: 'Modifica area di movimentazione',
+    campi: [
+      { id: 'nome', label: 'Nome area di movimentazione', valore: a.nome },
+      { id: 'punti', label: 'Punti carico-scarico dell\'area', tipo: 'checks', valore: a.puntiIds || [], opzioni: _opzioniPunti(a.puntiIds || []) },
+    ],
+    onSave: async v => {
+      if (!v.nome) throw new Error('Inserisci il nome dell\'area.');
+      if (!v.punti.length) throw new Error('Seleziona almeno un punto carico-scarico.');
+      if (_getState().aree.some(x => x.id !== id && (x.nome || '').toLowerCase() === v.nome.toLowerCase())) throw new Error('Area già esistente.');
+      await updateDoc(doc(window.db, 'ubicazioni', id), { nome: v.nome, puntiIds: v.punti });
+      showToast('Area aggiornata.', 'success');
+    },
+  });
+};
+
+window.toggleArea = async function (id, attiva) {
+  if (!_requireAdmin()) return;
+  try {
+    await updateDoc(doc(window.db, 'ubicazioni', id), { attivo: !!attiva });
+    showToast(attiva ? 'Area riattivata.' : 'Area disattivata.', 'success');
+  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+};
+
+window.deleteArea = async function (id) {
+  if (!_requireAdmin()) return;
+  const a = _getState().aree.find(x => x.id === id);
+  if (!a) return;
+  if (!confirm(`Eliminare l'area "${a.nome}"? I punti carico-scarico non vengono toccati.`)) return;
+  try {
+    await deleteDoc(doc(window.db, 'ubicazioni', id));
+    showToast('Area eliminata.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
