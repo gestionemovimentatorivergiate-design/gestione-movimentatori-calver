@@ -156,11 +156,15 @@ function _azBadge(a) {
 
 // ── STATISTICHE ──────────────────────────────────────────────────────────────
 // Tutto calcolato sulle missioni (non sullo storico, che è limitato alle ultime
-// voci). Le missioni ANNULLATE sono sempre escluse. Il periodo (Dal/Al) filtra
-// per data di creazione, tranne la tabella "Consegne per operatore e giorno",
-// che usa la data di consegna.
+// voci). Le missioni ANNULLATE sono sempre escluse.
+// Filtri: quelli in alto valgono per tutta la pagina; ogni sezione ha anche i
+// propri filtri locali (id "sl-…"): se impostati, per quella sezione
+// SOSTITUISCONO il filtro globale corrispondente.
+// Il periodo (Dal/Al) filtra per data di creazione, tranne la sezione
+// "Consegne per operatore", che usa la data di consegna (default: oggi).
 const _gg = ms => ms ? new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }) : '';   // aaaa-mm-gg
 const _ggIt = s => s ? s.split('-').reverse().join('/') : '';
+const _val = id => document.getElementById(id)?.value || '';
 
 export function renderStatistiche() {
   const st = _getState();
@@ -169,60 +173,79 @@ export function renderStatistiche() {
 
   const ubMap = {}; st.ubicazioni.forEach(u => { ubMap[u.id] = u; });
   const bMap = {};  st.buildings.forEach(b => { bMap[b.id] = b; });
-  const bLabel = id => bMap[id] ? (id + (bMap[id].nome && bMap[id].nome !== id ? ' · ' + bMap[id].nome : '')) : id;
+  // Building: "ID · descrizione" (se manca la descrizione, il nome)
+  const bLabel = id => {
+    const b = bMap[id]; if (!b) return id;
+    const d = (b.descrizione || b.nome || '').trim();
+    return d && d !== id ? id + ' · ' + d : id;
+  };
 
   const base = st.missioni.filter(m => m.stato !== 'annullata');
 
   // Menu a tendina riempiti con i valori presenti, mantenendo la scelta
-  const fillSel = (id, html, valide) => {
-    const sel = document.getElementById(id); if (!sel) return '';
-    const cur = sel.value;
-    sel.innerHTML = html;
-    if (valide.includes(cur)) sel.value = cur;
-    return sel.value;
+  const fillSel = (ids, html, valide) => {
+    let v = '';
+    [].concat(ids).forEach(id => {
+      const sel = document.getElementById(id); if (!sel) return;
+      const cur = sel.value;
+      sel.innerHTML = html;
+      if (valide.includes(cur)) sel.value = cur;
+      v = sel.value;
+    });
+    return v;
   };
   const opts = (vals, tutti) => `<option value="">${tutti}</option>` +
     [...new Set(vals.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'it', { numeric: true }))
       .map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
   const ops = base.map(m => m.navettaNome);
   const els = base.map(m => m.elementoCodice);
-  const fOp = fillSel('ss-op', opts(ops, 'Tutti'), ops);
-  const fEl = fillSel('ss-elemento', opts(els, 'Tutti'), els);
+  const bSorted = st.buildings.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), 'it', { numeric: true }));
+  const uSorted = st.ubicazioni.slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+  const bOpts = bSorted.map(b => `<option value="b:${esc(b.id)}">${esc(bLabel(b.id))}</option>`).join('');
+  const uOpts = uSorted.map(u => `<option value="u:${esc(u.id)}">${esc(u.nome)}</option>`).join('');
   const bpVals = st.buildings.map(b => 'b:' + b.id).concat(st.ubicazioni.map(u => 'u:' + u.id));
-  const bpHtml = '<option value="">Tutti</option>'
-    + '<optgroup label="Building">' + st.buildings.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), 'it', { numeric: true }))
-        .map(b => `<option value="b:${esc(b.id)}">${esc(bLabel(b.id))}</option>`).join('') + '</optgroup>'
-    + '<optgroup label="Punti carico-scarico">' + st.ubicazioni.slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }))
-        .map(u => `<option value="u:${esc(u.id)}">${esc(u.nome)}</option>`).join('') + '</optgroup>';
+  const bpHtml = '<option value="">Tutti</option><optgroup label="Building">' + bOpts + '</optgroup><optgroup label="Punti carico-scarico">' + uOpts + '</optgroup>';
+
+  const fOp = fillSel('ss-op', opts(ops, 'Tutti'), ops);
+  fillSel('ss-elemento', opts(els, 'Tutti'), els);
   const fBp = fillSel('ss-bp', bpHtml, bpVals);
-  const fTipo = document.getElementById('ss-tipo')?.value || '';
-  const fDa = document.getElementById('ss-da')?.value || '';
-  const fA  = document.getElementById('ss-a')?.value || '';
+  // filtri locali di sezione
+  const lTOp = fillSel('sl-t-op', opts(ops, 'Tutti'), ops);
+  const lTBp = fillSel('sl-t-bp', bpHtml, bpVals);
+  const lGOp = fillSel('sl-g-op', opts(ops, 'Tutti'), ops);
+  const lBBp = fillSel('sl-b-bp', '<option value="">Tutti i building</option>' + bOpts, bpVals);
+  const lPBp = fillSel('sl-p-bp', '<option value="">Tutti i punti</option>' + uOpts, bpVals);
+
+  const G = { op: fOp, el: _val('ss-elemento'), tipo: _val('ss-tipo'), bp: fBp };
+  const fDa = _val('ss-da'), fA = _val('ss-a');
 
   // Building e punti toccati da una missione (origine e/o destinazione)
   const punti = m => [...new Set([m.origineId, m.destinazioneId].filter(Boolean))];
   const bldgs = m => [...new Set([m.origineId, m.destinazioneId].map(i => ubMap[i]?.buildingId).filter(Boolean))];
-  const okBase = m =>
-    (!fOp || m.navettaNome === fOp) &&
-    (!fEl || m.elementoCodice === fEl) &&
-    (!fTipo || !!m[fTipo]) &&
-    (!fBp || (fBp[0] === 'b' ? bldgs(m).includes(fBp.slice(2)) : punti(m).includes(fBp.slice(2))));
-  const inRange = ms => {
-    if (!fDa && !fA) return true;
+  const okBase = (m, f) =>
+    (!f.op || m.navettaNome === f.op) &&
+    (!f.el || m.elementoCodice === f.el) &&
+    (!f.tipo || !!m[f.tipo]) &&
+    (!f.bp || (f.bp[0] === 'b' ? bldgs(m).includes(f.bp.slice(2)) : punti(m).includes(f.bp.slice(2))));
+  const inRange = (ms, da, a) => {
+    if (!da && !a) return true;
     const g = _gg(ms); if (!g) return false;
-    return (!fDa || g >= fDa) && (!fA || g <= fA);
+    return (!da || g >= da) && (!a || g <= a);
+  };
+  // missioni di una sezione: filtri globali, con eventuali sostituzioni locali
+  const sezione = (loc = {}) => {
+    const f = { ...G, ...Object.fromEntries(Object.entries(loc).filter(([, v]) => v)) };
+    return { f, M: base.filter(m => okBase(m, f) && inRange(tsVal(m.createdAt), fDa, fA)) };
   };
 
-  const M = base.filter(m => okBase(m) && inRange(tsVal(m.createdAt)));
-
-  // ── Riepilogo ──
   const diff = (m, a, b) => { const s = tsVal(m[a]), e = tsVal(m[b]); return (s && e && e >= s) ? e - s : null; };
   const media = (arr, a, b) => {
     const v = arr.map(m => diff(m, a, b)).filter(x => x != null);
     return { n: v.length, ms: v.length ? v.reduce((x, y) => x + y, 0) / v.length : null };
   };
-  const t1 = media(M, 'createdAt', 'presaInCaricoAt');
-  const t2 = media(M, 'presaInCaricoAt', 'consegnataAt');
+
+  // ── Riepilogo (filtri globali) ──
+  const M = sezione().M;
   const t3 = media(M, 'createdAt', 'consegnataAt');
   const completate = M.filter(m => m.stato === 'consegnata').length;
   const inCorso = M.filter(m => m.stato === 'richiesta' || m.stato === 'in_transito').length;
@@ -232,11 +255,12 @@ export function renderStatistiche() {
     <div class="statCard orange"><div class="val">${inCorso}</div><div class="lbl">In corso</div></div>
     <div class="statCard violet"><div class="val">${_fmtDurMs(t3.ms)}</div><div class="lbl">Tempo medio totale</div></div>`;
 
-  const tabella = (res, selKey, semplice) => {
+  // Tabella a barre (nome | missioni con barretta e numero [| partenze | arrivi])
+  const tabella = (res, selKey, semplice, vuoto) => {
     let rows = Object.entries(res);
     if (selKey) rows = rows.filter(([k]) => k === selKey);
     rows.sort((x, y) => y[1].tot - x[1].tot || x[1].nome.localeCompare(y[1].nome, 'it', { numeric: true }));
-    if (!rows.length) return '<div style="color:var(--muted);font-size:13px;padding:10px 2px">Nessuna consegna nel periodo selezionato.</div>';
+    if (!rows.length) return `<div style="color:var(--muted);font-size:13px;padding:10px 2px">${vuoto || 'Nessun dato'}</div>`;
     const max = rows[0][1].tot || 1;
     return `<div class="tableWrap"><table>
       <thead><tr><th>Nome</th><th>Missioni</th>${semplice ? '' : '<th style="text-align:center">Partenze</th><th style="text-align:center">Arrivi</th>'}</tr></thead>
@@ -245,9 +269,11 @@ export function renderStatistiche() {
         ${semplice ? '' : `<td style="text-align:center">${e.da}</td><td style="text-align:center">${e.a}</td>`}</tr>`).join('')}</tbody>
     </table></div>`;
   };
-  // ── 1. Tempi medi (3 grafici a barre affiancati: tutte / solo Blu / solo Rosse) ──
+
+  // ── 1. Tempi medi: tre grafici, ognuno nella propria card ──
+  const T = sezione({ op: lTOp, bp: lTBp });
   const sub = document.getElementById('stat-tempi-sub');
-  if (sub) sub.textContent = fOp ? 'Operatore: ' + fOp : 'Tutti gli operatori';
+  if (sub) sub.textContent = T.f.op ? 'Operatore: ' + T.f.op : 'Tutti gli operatori';
   const grafico = (elId, titolo, colTit, arr) => {
     const el = document.getElementById(elId); if (!el) return;
     const a1 = media(arr, 'createdAt', 'presaInCaricoAt'), a2 = media(arr, 'presaInCaricoAt', 'consegnataAt');
@@ -268,57 +294,62 @@ export function renderStatistiche() {
       barre.map(x => `<div style="flex:1;text-align:center;padding-top:5px"><div style="font-size:11px;font-weight:700">${x.lbl}</div>
         <div style="font-size:10px;color:var(--muted)">su ${x.t.n} ${x.t.n === 1 ? 'missione' : 'missioni'}</div></div>`).join('') + `</div>`;
   };
-  grafico('stat-tempi-all', 'Tutte', 'var(--text)', M);
-  grafico('stat-tempi-blu', '🔵 Linea Blu', '#2563eb', M.filter(m => m.lineaBlu));
-  grafico('stat-tempi-rossa', '🔴 Linea Rossa', '#dc2626', M.filter(m => m.lineaRossa));
+  // Con un filtro "Tipo" attivo, restano valorizzati solo i grafici che gli corrispondono
+  grafico('stat-tempi-all',   'Tutte',          'var(--text)', G.tipo ? [] : T.M);
+  grafico('stat-tempi-blu',   '🔵 Linea Blu',   '#2563eb',     (!G.tipo || G.tipo === 'lineaBlu')   ? T.M.filter(m => m.lineaBlu)   : []);
+  grafico('stat-tempi-rossa', '🔴 Linea Rossa', '#dc2626',     (!G.tipo || G.tipo === 'lineaRossa') ? T.M.filter(m => m.lineaRossa) : []);
 
-  // ── 2. Consegne per operatore nel giorno (default: oggi) ──
+  // ── 2. Consegne per operatore (data di consegna; default: oggi) ──
   const dayEl = document.getElementById('stat-giorni');
   if (dayEl) {
     const oggi = _gg(Date.now());
-    const dal = fDa || (fA ? '' : oggi), al = fA || (fDa ? '' : oggi);
-    const ok = ms => { const g = _gg(ms); return !!g && (!dal || g >= dal) && (!al || g <= al); };
-    const C = base.filter(m => m.stato === 'consegnata' && m.consegnataAt && okBase(m) && ok(tsVal(m.consegnataAt)));
+    const lDa = _val('sl-g-da'), lA = _val('sl-g-a');
+    let dal = lDa || lA ? lDa : fDa, al = lDa || lA ? lA : fA;
+    if (!dal && !al) { dal = oggi; al = oggi; }
+    const f = { ...G, op: lGOp || G.op };
+    const C = base.filter(m => m.stato === 'consegnata' && m.consegnataAt && okBase(m, f) && inRange(tsVal(m.consegnataAt), dal, al));
     const res = {};
     C.forEach(m => { const o = m.navettaNome || '—'; (res[o] = res[o] || { nome: o, tot: 0 }).tot++; });
     const subG = document.getElementById('stat-giorni-sub');
     if (subG) subG.textContent = dal && dal === al ? (dal === oggi ? 'Oggi · ' : '') + _ggIt(dal)
       : 'Dal ' + (_ggIt(dal) || 'inizio') + ' al ' + (_ggIt(al) || 'oggi');
-    dayEl.innerHTML = tabella(res, '', true) + (C.length ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">Totale consegne: <b>${C.length}</b></div>` : '');
+    dayEl.innerHTML = tabella(res, '', true, 'Nessuna consegna nel periodo selezionato.')
+      + (C.length ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">Totale consegne: <b>${C.length}</b></div>` : '');
   }
 
-  // ── 3. Missioni per Building e per Punto carico-scarico ──
-  const conta = (chiavi, nome) => {
+  // ── 3. Missioni per Building ──
+  const conta = (chiavi, nome, Ms) => {
     const r = {};
-    M.forEach(m => {
-      const set = chiavi(m);
-      set.forEach(k => {
-        const e = (r[k] = r[k] || { nome: nome(k, m), tot: 0, da: 0, a: 0 });
-        e.tot++;
-      });
-    });
+    Ms.forEach(m => chiavi(m).forEach(k => { (r[k] = r[k] || { nome: nome(k, m), tot: 0, da: 0, a: 0 }).tot++; }));
     return r;
   };
-  const bRes = conta(bldgs, k => bLabel(k));
-  M.forEach(m => {
+  const B = sezione({ bp: lBBp });
+  const bRes = conta(bldgs, k => bLabel(k), B.M);
+  B.M.forEach(m => {
     const bo = ubMap[m.origineId]?.buildingId, bd = ubMap[m.destinazioneId]?.buildingId;
     if (bo && bRes[bo]) bRes[bo].da++;
     if (bd && bRes[bd]) bRes[bd].a++;
   });
-  const pRes = conta(punti, (k, m) => ubMap[k]?.nome || (k === m.origineId ? m.origineNome : m.destinazioneNome) || k);
-  M.forEach(m => {
+  const bEl = document.getElementById('stat-building');
+  if (bEl) bEl.innerHTML = tabella(bRes, B.f.bp[0] === 'b' ? B.f.bp.slice(2) : '');
+
+  // ── 4. Missioni per Punto carico-scarico ──
+  const P = sezione({ bp: lPBp });
+  const pRes = conta(punti, (k, m) => ubMap[k]?.nome || (k === m.origineId ? m.origineNome : m.destinazioneNome) || k, P.M);
+  P.M.forEach(m => {
     if (m.origineId && pRes[m.origineId]) pRes[m.origineId].da++;
     if (m.destinazioneId && pRes[m.destinazioneId]) pRes[m.destinazioneId].a++;
   });
-  const bEl = document.getElementById('stat-building');
-  if (bEl) bEl.innerHTML = tabella(bRes, fBp[0] === 'b' ? fBp.slice(2) : '');
   const pEl = document.getElementById('stat-punti');
-  if (pEl) pEl.innerHTML = tabella(pRes, fBp[0] === 'u' ? fBp.slice(2) : '');
+  if (pEl) pEl.innerHTML = tabella(pRes, P.f.bp[0] === 'u' ? P.f.bp.slice(2) : '');
 }
 
 window.renderStatistiche = renderStatistiche;
+// Azzera i filtri globali e quelli di tutte le sezioni
 window.resetFiltriStat = function () {
-  ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp', 'ss-tipo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp', 'ss-tipo',
+   'sl-t-op', 'sl-t-bp', 'sl-g-da', 'sl-g-a', 'sl-g-op', 'sl-b-bp', 'sl-p-bp'
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   renderStatistiche();
 };
 
