@@ -60,10 +60,14 @@ export function renderStorico() {
   // Il filtro Stato guarda lo stato ATTUALE della missione (la sua voce più recente)
   const tvH = h => h.ts ? h.ts.getTime() : Number.MAX_SAFE_INTEGER;
   const ultimo = new Map();
-  H.forEach(h => { const k = chiave(h), o = ultimo.get(k); if (!o || tvH(h) >= tvH(o)) ultimo.set(k, h); });
+  // Le "Missione modificata" non cambiano lo stato: si ignorano per stabilire lo stato attuale
+  H.forEach(h => {
+    if (h.action === 'Missione modificata') return;
+    const k = chiave(h), o = ultimo.get(k); if (!o || tvH(h) >= tvH(o)) ultimo.set(k, h);
+  });
   const trovate = new Set(H.filter(h =>
     (!nessunFiltro || !h.ts || h.ts.getTime() >= da) &&
-    (!fAz  || stato(ultimo.get(chiave(h))) === fAz) &&
+    (!fAz  || stato(ultimo.get(chiave(h)) || h) === fAz) &&
     (!fUt  || utente(h) === fUt) &&
     (!fPer || percorso(h) === fPer) &&
     (!fEl  || h.elemento === fEl) &&
@@ -96,9 +100,12 @@ export function renderStorico() {
   const prima = (v, f) => (v.find(h => f(h)) || v[0]);
 
   body.innerHTML = lista.length ? lista.map(({ k, v }) => {
-    const p = v[0], ult = v[v.length - 1];
-    const el = prima(v, h => h.elemento).elemento;
-    const pe = prima(v, h => h.origine || h.destinazione);
+    const p = v[0];
+    const ult = [...v].reverse().find(x => x.action !== 'Missione modificata') || v[v.length - 1];
+    // Elemento e percorso: i valori più recenti (una modifica può averli cambiati)
+    const rv = [...v].reverse();
+    const el = (rv.find(h => h.elemento) || p).elemento;
+    const pe = rv.find(h => h.origine || h.destinazione) || p;
     const aperto = p.codice && _stAperti.has(k);
     const idCell = p.codice
       ? `<a href="#" onclick="toggleMissioneStorico('${esc(k)}');return false" style="color:var(--text);font-weight:700;text-decoration:underline">${aperto ? '▾' : '▸'} ${esc(p.codice)}</a>`
@@ -118,7 +125,7 @@ export function renderStorico() {
       <td class="mono" style="font-size:11px;white-space:nowrap;padding-left:22px">${dataStr(x.ts)}</td>
       <td class="mono" style="font-size:11px;white-space:nowrap">${oraStr(x.ts)}</td>
       <td></td>
-      <td>${_azBadge(stato(x))}</td>
+      <td>${_azBadge(stato(x))}${x.dettaglio ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(x.dettaglio)}</div>` : ''}</td>
       <td></td><td></td>
       <td style="font-size:12px;color:var(--muted)">${esc(utente(x) || '—')}</td>
     </tr>`).join('');
@@ -138,6 +145,7 @@ function _azBadge(a) {
     'Missione creata':      'blue',
     'Preso in carico':      'orange',
     'Consegna completata':  'green',
+    'Missione modificata':  'blue',
     'Missione annullata':   'red',
     'Storico eliminato':    'red',
   };

@@ -14,6 +14,7 @@
 //    lineaBlu: true se la missione è prioritaria (spunta "Linea Blu"); assente = false
 //    vuoto: true se è una missione di vuoto (spunta "Vuoto"); assente = false. Non cambia
 //           l'ordinamento. Vuoto, Linea Blu e Linea Rossa sono mutuamente esclusive.
+//    modificataAt: ultima modifica (solo il creatore, solo finché è 'richiesta')
 //    lineaRossa: true se la missione è prioritaria come la Linea Blu (spunta "Linea Rossa")
 
 import {
@@ -297,10 +298,122 @@ function _cardMissioneAttesa(m) {
       <div class="mMeta">Creata: ${_dataOraSec(m.createdAt)}</div>
       <div class="mActions">
         <button class="btnGray" onclick="stampaFoglioTrasferimento('${m.id}')">🖨 Stampa foglio trasferimento</button>
+        <button class="btnGray" onclick="modificaMissione('${m.id}')">✏️ Modifica</button>
         <button class="btnGray" onclick="annullaMissione('${m.id}')">✕ Annulla</button>
       </div>
     </div>`;
 }
+
+// ── AZIONE: modifica missione (solo 'richiesta', solo l'utente che l'ha creata) ──
+// Modificabili: elemento, origine, destinazione, spunte Linea Blu / Linea Rossa / Vuoto.
+// L'ID e la data di creazione non cambiano (quindi la posizione in lista resta la stessa).
+window.modificaMissione = function (id) {
+  const u = _getUser();
+  const st = _getState();
+  const m = st.missioni.find(x => x.id === id);
+  if (!m) return;
+  if (m.ownerUid !== u.uid) { showToast('Puoi modificare solo le tue missioni.', 'error'); return; }
+  if (m.stato !== 'richiesta') { showToast('Modificabile solo finché è in attesa.', 'error'); return; }
+
+  document.getElementById('modalModificaMissione')?.remove();
+  const elementi = st.elementi.filter(e => e.attivo !== false || e.id === m.elementoId)
+    .sort((a, b) => String(a.codice).localeCompare(String(b.codice), 'it', { numeric: true }));
+  const ubic = st.ubicazioni.filter(x => x.attivo !== false || x.id === m.origineId || x.id === m.destinazioneId)
+    .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+  const opt = (list, lab, sel) => list.map(x => `<option value="${x.id}"${x.id === sel ? ' selected' : ''}>${esc(x[lab])}</option>`).join('');
+  const box = (cid, col, txt) => `<label id="${cid}-wrap" style="display:flex;align-items:center;gap:10px;margin:8px 0;padding:10px 12px;` +
+    `border:1px solid ${col}55;border-radius:8px;background:${col}12;font-weight:700;user-select:none">` +
+    `<input type="checkbox" id="${cid}" style="width:20px;height:20px;margin:0;accent-color:${col}">` +
+    `<span>${txt}</span><span id="${cid}-hint" style="font-size:11px;font-weight:500;color:var(--muted);margin-left:auto"></span></label>`;
+
+  const ov = document.createElement('div');
+  ov.className = 'modalOverlay open';
+  ov.id = 'modalModificaMissione';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div class="modalBox">
+    <h3>Modifica missione${m.codice ? ' ' + esc(m.codice) : ''}</h3>
+    <div class="field"><label>Elemento da spostare</label><select id="mm-elemento">${opt(elementi, 'codice', m.elementoId)}</select></div>
+    <div class="field"><label>Origine</label><select id="mm-origine">${opt(ubic, 'nome', m.origineId)}</select></div>
+    <div class="field"><label>Destinazione</label><select id="mm-destinazione">${opt(ubic, 'nome', m.destinazioneId)}</select></div>
+    ${box('mm-blu', '#2563eb', '🔵 Linea Blu')}
+    ${box('mm-rossa', '#dc2626', '🔴 Linea Rossa')}
+    ${box('mm-vuoto', '#16a34a', '🟢 Vuoto')}
+    <div class="modalActions">
+      <button class="btnGray" id="mm-annulla">Chiudi</button>
+      <button class="btnGreen" id="mm-salva">Salva modifiche</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+
+  const $ = x => document.getElementById(x);
+  $('mm-blu').checked = !!m.lineaBlu; $('mm-rossa').checked = !!m.lineaRossa; $('mm-vuoto').checked = !!m.vuoto;
+
+  // Stesse regole della creazione: le tre spunte sono mutuamente esclusive e
+  // la Linea Blu richiede un'origine del building B26.
+  const regole = () => {
+    const ub = st.ubicazioni.find(x => x.id === $('mm-origine').value);
+    const okB = !!ub && ub.buildingId === LINEA_BLU_BUILDING;
+    if (!okB) $('mm-blu').checked = false;
+    const b = $('mm-blu').checked, r = $('mm-rossa').checked, v = $('mm-vuoto').checked;
+    const ok = { blu: okB && !r && !v, rossa: !b && !v, vuoto: !b && !r };
+    [['blu', 'mm-blu'], ['rossa', 'mm-rossa'], ['vuoto', 'mm-vuoto']].forEach(([k, cid]) => {
+      $(cid).disabled = !ok[k];
+      $(cid + '-wrap').style.opacity = ok[k] ? '1' : '.5';
+      $(cid + '-wrap').style.cursor = ok[k] ? 'pointer' : 'not-allowed';
+      $(cid + '-hint').textContent = ok[k] ? '' : (k === 'blu' && !okB ? `Solo per origini del building ${LINEA_BLU_BUILDING}` : 'Non compatibile con la spunta scelta');
+    });
+  };
+  ['mm-origine', 'mm-blu', 'mm-rossa', 'mm-vuoto'].forEach(x => { $(x).onchange = regole; });
+  regole();
+
+  $('mm-annulla').onclick = () => ov.remove();
+  $('mm-salva').onclick = async () => {
+    const el = st.elementi.find(x => x.id === $('mm-elemento').value);
+    const orig = st.ubicazioni.find(x => x.id === $('mm-origine').value);
+    const dest = st.ubicazioni.find(x => x.id === $('mm-destinazione').value);
+    if (!el || !orig || !dest) { showToast('Seleziona elemento, origine e destinazione.', 'error'); return; }
+    const nuovo = {
+      elementoId: el.id, elementoCodice: el.codice,
+      origineId: orig.id, origineNome: orig.nome,
+      destinazioneId: dest.id, destinazioneNome: dest.nome,
+      lineaBlu: $('mm-blu').checked && orig.buildingId === LINEA_BLU_BUILDING,
+      lineaRossa: $('mm-rossa').checked,
+      vuoto: $('mm-vuoto').checked,
+    };
+    const diff = [];
+    if (nuovo.elementoId !== m.elementoId) diff.push(`Elemento: ${m.elementoCodice} → ${nuovo.elementoCodice}`);
+    if (nuovo.origineId !== m.origineId) diff.push(`Origine: ${m.origineNome} → ${nuovo.origineNome}`);
+    if (nuovo.destinazioneId !== m.destinazioneId) diff.push(`Destinazione: ${m.destinazioneNome} → ${nuovo.destinazioneNome}`);
+    [['lineaBlu', 'Linea Blu'], ['lineaRossa', 'Linea Rossa'], ['vuoto', 'Vuoto']].forEach(([k, lab]) => {
+      if (!!m[k] !== !!nuovo[k]) diff.push(`${lab}: ${m[k] ? 'sì' : 'no'} → ${nuovo[k] ? 'sì' : 'no'}`);
+    });
+    if (!diff.length) { showToast('Nessuna modifica da salvare.', 'error'); return; }
+
+    const btn = $('mm-salva'); btn.disabled = true; btn.textContent = '⏳ Salvataggio…';
+    try {
+      // Transazione: la missione deve essere ancora in attesa e di proprietà dell'utente
+      const ref = doc(window.db, 'missioni', id);
+      await runTransaction(window.db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('Missione non trovata.');
+        const cur = snap.data();
+        if (cur.ownerUid !== u.uid) throw new Error('Puoi modificare solo le tue missioni.');
+        if (cur.stato !== 'richiesta') throw new Error('La missione è già stata presa in carico: non è più modificabile.');
+        tx.update(ref, { ...nuovo, modificataAt: serverTimestamp() });
+      });
+      await window.logHistory({
+        action: 'Missione modificata', codice: m.codice || null,
+        elemento: nuovo.elementoCodice, origine: nuovo.origineNome, destinazione: nuovo.destinazioneNome,
+        lineaBlu: nuovo.lineaBlu, lineaRossa: nuovo.lineaRossa, vuoto: nuovo.vuoto,
+        dettaglio: diff.join(' · '),
+      });
+      ov.remove();
+      showToast('Missione modificata.', 'success');
+    } catch (e) {
+      btn.disabled = false; btn.textContent = 'Salva modifiche';
+      showToast('Errore: ' + e.message, 'error');
+    }
+  };
+};
 
 // ── AZIONE: annulla missione (solo 'richiesta', solo l'utente che l'ha creata) ────────────────
 window.annullaMissione = async function (id) {
