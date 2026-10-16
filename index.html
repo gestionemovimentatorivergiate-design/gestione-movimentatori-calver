@@ -175,15 +175,32 @@
   <!-- ── PAGINA: STATISTICHE (amministrativo/amministratore) ─────────────────── -->
   <div class="page" id="pageStatistiche">
     <div class="pageHeader">Statistiche</div>
-    <div class="pageSubtitle">Panoramica delle movimentazioni</div>
+    <div class="pageSubtitle">Missioni annullate escluse · il periodo filtra per data di creazione</div>
+    <div class="filterBar" style="align-items:flex-end">
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Dal</div><input type="date" id="ss-da" onchange="renderStatistiche()"></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Al</div><input type="date" id="ss-a" onchange="renderStatistiche()"></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Operatore</div><select id="ss-op" onchange="renderStatistiche()"><option value="">Tutti</option></select></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Elemento</div><select id="ss-elemento" onchange="renderStatistiche()"><option value="">Tutti</option></select></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Building / Punto</div><select id="ss-bp" onchange="renderStatistiche()"><option value="">Tutti</option></select></div>
+      <button class="btnGray btnSmall" onclick="resetFiltriStat()">✕ Azzera filtri</button>
+    </div>
     <div class="statsRow" id="stat-cards"></div>
     <div class="card">
-      <div class="cardTitle">Elementi più movimentati</div>
-      <div id="stat-topElementi"></div>
+      <div class="cardTitle">Tempo medio di passaggio tra stati</div>
+      <div class="pageSubtitle" id="stat-tempi-sub" style="margin-top:-4px"></div>
+      <div id="stat-tempi"></div>
     </div>
     <div class="card">
-      <div class="cardTitle">Attività per punto carico-scarico</div>
-      <div id="stat-topUbic"></div>
+      <div class="cardTitle">Consegne completate per operatore e giorno</div>
+      <div id="stat-giorni"></div>
+    </div>
+    <div class="card">
+      <div class="cardTitle">Missioni per Building</div>
+      <div id="stat-building"></div>
+    </div>
+    <div class="card">
+      <div class="cardTitle">Missioni per punto carico-scarico</div>
+      <div id="stat-punti"></div>
     </div>
   </div>
 
