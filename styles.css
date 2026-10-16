@@ -125,11 +125,13 @@ body {
 /* ══ FORM ════════════════════════════════════════════════════════════════════ */
 .field { margin-bottom: 14px; }
 .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
-.field input, .field select {
+.field input, .field select, .field textarea {
   width: 100%; background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px;
   color: var(--text); font-family: inherit; font-size: 15px; outline: none; transition: border-color .15s;
 }
-.field input:focus, .field select:focus { border-color: var(--accent); }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+.field textarea { resize: vertical; min-height: 70px; line-height: 1.4; }
+.field label .opt { text-transform: none; font-weight: 500; letter-spacing: 0; }
 .checkLabel { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text2); margin-bottom: 12px; cursor: pointer; user-select: none; }
 .checkLabel input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent); }
 
