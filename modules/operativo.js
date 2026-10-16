@@ -14,6 +14,7 @@
 //    lineaBlu: true se la missione è prioritaria (spunta "Linea Blu"); assente = false
 //    vuoto: true se è una missione di vuoto (spunta "Vuoto"); assente = false. Non cambia
 //           l'ordinamento. Vuoto, Linea Blu e Linea Rossa sono mutuamente esclusive.
+//    note: testo libero facoltativo (max 300 caratteri), modificabile dal creatore finché è 'richiesta'
 //    modificataAt: ultima modifica (solo il creatore, solo finché è 'richiesta')
 //    lineaRossa: true se la missione è prioritaria come la Linea Blu (spunta "Linea Rossa")
 
@@ -209,6 +210,7 @@ window.creaMissione = async function () {
 
   // Linea Blu valida solo se l'origine appartiene al building B26
   const vuoto = !!document.getElementById('nm-vuoto')?.checked;
+  const note = (document.getElementById('nm-note')?.value || '').trim().slice(0, 300);
   const rossaSel = !!document.getElementById('nm-linearossa')?.checked;
   // Mutuamente esclusive: Linea Blu, Linea Rossa e Vuoto non vengono mai salvate insieme
   const lineaBlu = !vuoto && !rossaSel && !!document.getElementById('nm-lineablu')?.checked
@@ -233,7 +235,7 @@ window.creaMissione = async function () {
         elementoId: elId, elementoCodice: elemento.codice,
         origineId: orId, origineNome: origine.nome,
         destinazioneId: deId, destinazioneNome: destinazione.nome,
-        lineaBlu, lineaRossa, vuoto,
+        lineaBlu, lineaRossa, vuoto, note,
         stato: 'richiesta',
         navettaId: null, navettaNome: null,
         ownerUid: u.uid, ownerNome: u.name || u.email,
@@ -243,13 +245,14 @@ window.creaMissione = async function () {
     await window.logHistory({
       action: 'Missione creata', codice, elemento: elemento.codice,
       origine: origine.nome, destinazione: destinazione.nome,
-      lineaBlu, lineaRossa, vuoto,
+      lineaBlu, lineaRossa, vuoto, note,
     });
     showToast(`Missione${lineaBlu ? ' LINEA BLU' : ''}${lineaRossa ? ' LINEA ROSSA' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${elemento.codice} → ${destinazione.nome}`, 'success');
     // Reset selezioni
     document.getElementById('nm-elemento').value = '';
     document.getElementById('nm-origine').value = '';
     document.getElementById('nm-destinazione').value = '';
+    const cn = document.getElementById('nm-note'); if (cn) cn.value = '';
     const cb = document.getElementById('nm-lineablu'); if (cb) cb.checked = false;
     const cr = document.getElementById('nm-linearossa'); if (cr) cr.checked = false;
     const cv = document.getElementById('nm-vuoto'); if (cv) cv.checked = false;
@@ -295,6 +298,7 @@ function _cardMissioneAttesa(m) {
         <span class="mStatoBadge richiesta">In attesa</span>
       </div>
       <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
+      ${m.note ? `<div class="mMeta" style="color:var(--text2);font-size:13px;white-space:pre-wrap">📝 ${esc(m.note)}</div>` : ''}
       <div class="mMeta">Creata: ${_dataOraSec(m.createdAt)}</div>
       <div class="mActions">
         <button class="btnGray" onclick="stampaFoglioTrasferimento('${m.id}')">🖨 Stampa foglio trasferimento</button>
@@ -335,6 +339,7 @@ window.modificaMissione = function (id) {
     <div class="field"><label>Elemento da spostare</label><select id="mm-elemento">${opt(elementi, 'codice', m.elementoId)}</select></div>
     <div class="field"><label>Origine</label><select id="mm-origine">${opt(ubic, 'nome', m.origineId)}</select></div>
     <div class="field"><label>Destinazione</label><select id="mm-destinazione">${opt(ubic, 'nome', m.destinazioneId)}</select></div>
+    <div class="field"><label>Note <span class="opt">(facoltativo)</span></label><textarea id="mm-note" rows="2" maxlength="300" placeholder="Eventuali indicazioni per il movimentatore (non obbligatorio)">${esc(m.note || '')}</textarea></div>
     ${box('mm-blu', '#2563eb', '🔵 Linea Blu')}
     ${box('mm-rossa', '#dc2626', '🔴 Linea Rossa')}
     ${box('mm-vuoto', '#16a34a', '🟢 Vuoto')}
@@ -378,6 +383,7 @@ window.modificaMissione = function (id) {
       lineaBlu: $('mm-blu').checked && orig.buildingId === LINEA_BLU_BUILDING,
       lineaRossa: $('mm-rossa').checked,
       vuoto: $('mm-vuoto').checked,
+      note: ($('mm-note').value || '').trim().slice(0, 300),
     };
     const diff = [];
     if (nuovo.elementoId !== m.elementoId) diff.push(`Elemento: ${m.elementoCodice} → ${nuovo.elementoCodice}`);
@@ -386,6 +392,7 @@ window.modificaMissione = function (id) {
     [['lineaBlu', 'Linea Blu'], ['lineaRossa', 'Linea Rossa'], ['vuoto', 'Vuoto']].forEach(([k, lab]) => {
       if (!!m[k] !== !!nuovo[k]) diff.push(`${lab}: ${m[k] ? 'sì' : 'no'} → ${nuovo[k] ? 'sì' : 'no'}`);
     });
+    if ((m.note || '') !== nuovo.note) diff.push(nuovo.note ? (m.note ? 'Note modificate' : 'Note aggiunte') : 'Note rimosse');
     if (!diff.length) { showToast('Nessuna modifica da salvare.', 'error'); return; }
 
     const btn = $('mm-salva'); btn.disabled = true; btn.textContent = '⏳ Salvataggio…';
@@ -403,7 +410,7 @@ window.modificaMissione = function (id) {
       await window.logHistory({
         action: 'Missione modificata', codice: m.codice || null,
         elemento: nuovo.elementoCodice, origine: nuovo.origineNome, destinazione: nuovo.destinazioneNome,
-        lineaBlu: nuovo.lineaBlu, lineaRossa: nuovo.lineaRossa, vuoto: nuovo.vuoto,
+        lineaBlu: nuovo.lineaBlu, lineaRossa: nuovo.lineaRossa, vuoto: nuovo.vuoto, note: nuovo.note,
         dettaglio: diff.join(' · '),
       });
       ov.remove();

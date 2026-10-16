@@ -98,6 +98,7 @@ function _card(item) {
         ${statoBadge}
       </div>
       <div class="mRoute"><span class="mLoc">${esc(item.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(item.destinazioneNome)}</span></div>
+      ${item.note ? `<div class="mMeta" style="color:var(--text2);font-size:13px;white-space:pre-wrap">📝 ${esc(item.note)}</div>` : ''}
       <div class="mMeta">${meta}</div>
       <div class="mActions">${actionBtn}</div>
     </div>`;
