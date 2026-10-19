@@ -54,6 +54,8 @@ function showPage(id, btn) {
   if (pg) pg.classList.add('active');
   if (btn) btn.classList.add('active');
   currentPage = id;
+  // Ricorda la scheda aperta: dopo un ricaricamento si torna qui
+  try { if (currentUser) localStorage.setItem('paginaCorrente:' + currentUser.uid, id); } catch (e) {}
   refreshCurrentPage();
 }
 window.showPage = showPage;
@@ -235,6 +237,10 @@ function showApp() {
 
   startListeners();
 
-  // Apre la prima scheda disponibile per il ruolo
-  if (firstBtn) showPage(firstBtn.dataset.page, firstBtn);
+  // Riapre l'ultima scheda usata (se il ruolo la consente), altrimenti la prima disponibile
+  let saved = '';
+  try { saved = localStorage.getItem('paginaCorrente:' + currentUser.uid) || ''; } catch (e) {}
+  const savedBtn = [...document.querySelectorAll('.navBtn')].find(b => b.dataset.page === saved && !b.classList.contains('hidden'));
+  const start = savedBtn || firstBtn;
+  if (start) showPage(start.dataset.page, start);
 }
