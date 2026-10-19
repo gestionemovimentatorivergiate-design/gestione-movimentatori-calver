@@ -298,12 +298,15 @@ window.confermaMissione = function (id) {
     <div id="cd-msg" style="display:none;margin-top:10px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600"></div>
 
     ${mobile ? `<div style="display:flex;align-items:center;gap:10px;margin:16px 0 10px;color:var(--muted);font-size:12px;font-weight:700">
-      <div style="flex:1;height:1px;background:var(--border)"></div>OPPURE A MANO<div style="flex:1;height:1px;background:var(--border)"></div></div>
-    <div class="field"><label>Punto di consegna</label>
-      <select id="cd-sel"><option value="">Seleziona il punto di consegna…</option>${punti.map(x => `<option value="${esc(x.id)}">${esc(etichetta(x))}</option>`).join('')}</select></div>`
-    : `<div class="field" style="margin-top:14px"><label>Punto di consegna</label>
-      <input type="text" id="cd-txt" list="cd-lista" placeholder="Scrivi il punto, es. ${esc(m.destinazioneNome)}" autocomplete="off" spellcheck="false">
-      <datalist id="cd-lista">${punti.map(x => `<option value="${esc(x.nome)}">${esc(etichetta(x))}</option>`).join('')}</datalist></div>`}
+      <div style="flex:1;height:1px;background:var(--border)"></div>OPPURE A MANO<div style="flex:1;height:1px;background:var(--border)"></div></div>` : ''}
+    <div class="field" style="${mobile ? '' : 'margin-top:14px'}"><label>Punto di consegna</label>
+      <input type="text" id="cd-txt" placeholder="Scrivi per cercare o scegli dall'elenco" autocomplete="off" spellcheck="false">
+      <div id="cd-lista" style="max-height:210px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:4px;background:var(--surface);margin-top:6px">
+        ${punti.map(x => `<div class="cdRow" data-id="${esc(x.id)}" data-t="${esc((x.nome + ' ' + etichetta(x)).toLowerCase())}" style="padding:9px 12px;border-radius:8px;cursor:pointer;border:1.5px solid transparent">
+          <div style="font-weight:700;font-size:14px">${esc(x.nome)}</div>
+          ${etichetta(x) !== x.nome ? `<div style="font-size:12px;color:var(--muted)">${esc(etichetta(x).slice(x.nome.length + 3))}</div>` : ''}</div>`).join('')}
+        <div id="cd-vuoto" style="display:none;padding:10px;color:var(--muted);font-size:13px">Nessun punto trovato.</div>
+      </div></div>
     <button class="btnGreen" id="cd-manuale" style="width:100%">✅ Conferma manualmente</button>
     <div class="modalActions"><button class="btnGray" id="cd-chiudi">Annulla</button></div>
   </div>`;
@@ -364,21 +367,37 @@ window.confermaMissione = function (id) {
       }
     };
   }
+  // Elenco punti: filtro mentre si scrive, selezione con un tocco
+  let scelto = '';
+  const righe = [...ov.querySelectorAll('.cdRow')];
+  const evidenzia = () => righe.forEach(r => {
+    const on = r.dataset.id === scelto;
+    r.style.background = on ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : '';
+    r.style.borderColor = on ? 'var(--accent2)' : 'transparent';
+  });
+  const filtra = () => {
+    const q = $('cd-txt').value.trim().toLowerCase();
+    let n = 0;
+    righe.forEach(r => { const v = !q || r.dataset.t.includes(q); r.style.display = v ? '' : 'none'; if (v) n++; });
+    $('cd-vuoto').style.display = n ? 'none' : 'block';
+  };
+  righe.forEach(r => r.onclick = () => {
+    scelto = r.dataset.id;
+    $('cd-txt').value = st.ubicazioni.find(x => x.id === scelto)?.nome || '';
+    evidenzia();
+  });
+  $('cd-txt').addEventListener('input', () => { scelto = ''; evidenzia(); filtra(); });
   $('cd-manuale').onclick = () => {
-    let ub = null;
-    if (mobile) {
-      const v = $('cd-sel').value;
-      if (!v) { msg('Seleziona il punto di consegna dal menù.', false); return; }
-      ub = st.ubicazioni.find(x => x.id === v);
-    } else {
+    let ub = scelto ? st.ubicazioni.find(x => x.id === scelto) : null;
+    if (!ub) {
       const v = _norm($('cd-txt').value);
-      if (!v) { msg('Scrivi il punto di consegna.', false); return; }
+      if (!v) { msg('Scegli o scrivi il punto di consegna.', false); return; }
       ub = st.ubicazioni.find(x => _norm(x.nome) === v || _norm(x.id) === v);
-      if (!ub) { msg('Punto non trovato: controlla il nome e riprova.', false); return; }
+      if (!ub) { msg('Punto non trovato: scegli un punto dall\'elenco.', false); return; }
     }
-    if (ub) conferma(ub, 'manuale');
+    conferma(ub, 'manuale');
   };
   // Invio dalla tastiera (PC)
   $('cd-txt')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('cd-manuale').click(); });
-  setTimeout(() => $('cd-txt')?.focus(), 50);
+  if (!mobile) setTimeout(() => $('cd-txt')?.focus(), 50);   // su telefono non si apre la tastiera da sola
 };
