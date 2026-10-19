@@ -467,13 +467,44 @@ window.renderStorico = renderStorico;
 // Doppia conferma: finestra di avviso + parola "ELIMINA" da scrivere.
 // Protezione anche lato server: le regole Firestore permettono la cancellazione
 // di `history` solo agli amministratori.
+// Finestra di conferma nello stile delle altre finestre dell'app: per procedere
+// bisogna scrivere ELIMINA (il bottone resta disattivato finché non è corretto).
+function _dialogEliminaStorico(quanti) {
+  return new Promise(resolve => {
+    document.getElementById('modalEliminaStorico')?.remove();
+    const ov = document.createElement('div');
+    ov.className = 'modalOverlay open';
+    ov.id = 'modalEliminaStorico';
+    ov.innerHTML = `<div class="modalBox">
+      <h3>Elimina dati storici</h3>
+      <div style="padding:10px 12px;border-radius:8px;background:#dc262618;color:#b91c1c;font-size:13px;font-weight:600;margin-bottom:12px">
+        ⚠️ Verranno cancellati tutti i movimenti registrati${quanti ? ` (${quanti} voci caricate)` : ''}. L'operazione NON si può annullare.</div>
+      <div class="field"><label>Per confermare scrivi ELIMINA</label>
+        <input type="text" id="es-conf" placeholder="ELIMINA" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      <div class="modalActions">
+        <button class="btnGray" id="es-back">Annulla</button>
+        <button class="btnRed" id="es-ok" disabled style="opacity:.45">🗑 Elimina tutto</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const chiudi = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') chiudi(false); };
+    document.addEventListener('keydown', onKey);
+    ov.onclick = e => { if (e.target === ov) chiudi(false); };
+    const inp = document.getElementById('es-conf'), ok = document.getElementById('es-ok');
+    const valido = () => inp.value.trim() === 'ELIMINA';
+    inp.addEventListener('input', () => { ok.disabled = !valido(); ok.style.opacity = valido() ? '1' : '.45'; });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter' && valido()) chiudi(true); });
+    document.getElementById('es-back').onclick = () => chiudi(false);
+    ok.onclick = () => { if (valido()) chiudi(true); };
+    inp.focus();
+  });
+}
+
 window.eliminaStorico = async function () {
   const u = _getUser();
   if (!u || u.role !== 'amministratore') { showToast('Solo un amministratore può eliminare lo storico.', 'error'); return; }
-  if (!confirm('Eliminare TUTTO lo storico?\n\nL\'operazione cancella ogni movimento registrato e NON si può annullare.')) return;
-  if (prompt('Per confermare scrivi ELIMINA (in maiuscolo):') !== 'ELIMINA') {
-    showToast('Eliminazione annullata.', 'error'); return;
-  }
+  const quanti = (_getState().history || []).length;
+  if (!await _dialogEliminaStorico(quanti)) return;
   const btn = document.getElementById('st-reset');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Eliminazione…'; }
   try {
