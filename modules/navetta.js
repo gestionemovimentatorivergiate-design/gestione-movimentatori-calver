@@ -68,7 +68,9 @@ export function renderInCorso() {
   // Un'unica lista: prima le missioni LINEA BLU, poi tutto il resto; a parità
   // ordinata per anzianità. Prendere un elemento non lo sposta di posizione
   // (la card "rimane" dov'era), perché lineaBlu e createdAt non cambiano.
-  const lista = avMiss.concat(tkMiss)
+  // Filtro per stato: Aperta (da prendere) / In carico
+  const fStato = document.getElementById('ic-stato')?.value || '';
+  const lista = (fStato === 'aperta' ? avMiss : fStato === 'carico' ? tkMiss : avMiss.concat(tkMiss))
     .sort((a, b) => ((b.lineaBlu || b.lineaRossa) ? 1 : 0) - ((a.lineaBlu || a.lineaRossa) ? 1 : 0)
                  || tsVal(a.createdAt) - tsVal(b.createdAt));
 
@@ -76,14 +78,15 @@ export function renderInCorso() {
   const statsEl = document.getElementById('incorso-stats');
   if (statsEl) {
     statsEl.innerHTML = `
-      <div class="statCard orange"><div class="val">${avMiss.length}</div><div class="lbl">Da prendere</div></div>
+      <div class="statCard orange"><div class="val">${avMiss.length}</div><div class="lbl">Aperte</div></div>
       <div class="statCard green"><div class="val">${tkMiss.length}</div><div class="lbl">In carico</div></div>`;
   }
 
-  if (!lista.length) { el.innerHTML = area ? '<div class="emptyState">Nessuna missione per quest\'area. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
+  if (!lista.length) { el.innerHTML = (area || fStato) ? '<div class="emptyState">Nessuna missione con questi filtri. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
   el.innerHTML = lista.map(_card).join('');
 }
 
+window.renderInCorso = renderInCorso;
 window.cambiaAreaInCorso = function () {
   const u = _getUser();
   try { localStorage.setItem('areaInCorso:' + u.uid, document.getElementById('ic-area')?.value || ''); } catch (e) {}
@@ -94,13 +97,16 @@ function _card(item) {
   let statoBadge, actionBtn, meta;
   if (item._avail) {
     // Da prendere → pulsante GIALLO
-    statoBadge = `<span class="mStatoBadge richiesta">In coda</span>`;
+    statoBadge = `<span class="mStatoBadge richiesta">Aperta</span>`;
     meta = `⏱ in coda da ${fmtDur(item.createdAt)}`;
     actionBtn = `<button class="btnOrange" onclick="prendiMissione('${item.id}')">🚚 Prendi in carico</button>`;
   } else {
     // Preso in carico → pulsante VERDE
-    statoBadge = `<span class="mStatoBadge in_transito">In transito</span>`;
-    meta = `Preso in carico da ${fmtDur(item.presaInCaricoAt)}${item.navettaNome ? ' · ' + esc(item.navettaNome) : ''}`;
+    statoBadge = `<span class="mStatoBadge in_transito">In carico</span>`;
+    // Chi ha preso in carico: ben visibile (grande e in grassetto)
+    meta = `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">`
+      + (item.navettaNome ? `<span style="font-size:19px;font-weight:800;color:var(--text);line-height:1.2">👤 ${esc(item.navettaNome)}</span>` : '')
+      + `<span style="font-size:12px;color:var(--muted)">in carico da ${fmtDur(item.presaInCaricoAt)}</span></div>`;
     actionBtn = `<button class="btnGreen" onclick="confermaMissione('${item.id}')">✅ Conferma consegna</button>`;
   }
 
