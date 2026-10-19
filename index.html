@@ -192,6 +192,7 @@
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Area di movimentazione</div><select id="ss-area" onchange="renderStatistiche()"><option value="">Tutte</option></select></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Tipo</div><select id="ss-tipo" onchange="renderStatistiche()"><option value="">Tutte</option><option value="lineaBlu">Solo Linea Blu</option><option value="lineaRossa">Solo Linea Rossa</option><option value="vuoto">Solo Vuoti</option></select></div>
       <button class="btnGray btnSmall" onclick="resetFiltriStat()">✕ Azzera filtri</button>
+      <button class="btnGray btnSmall" id="ss-azzera" style="display:none;color:#dc2626;border:1.5px solid #dc2626" onclick="azzeraStatistiche()">🗑 Azzera statistiche</button>
     </div>
     <div class="statsRow" id="stat-cards"></div>
     <div class="card">
