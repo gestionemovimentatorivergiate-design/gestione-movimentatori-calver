@@ -49,7 +49,18 @@ export function renderInCorso() {
     sel.value = aree.some(a => a.id === cur) ? cur : '';
     area = aree.find(a => a.id === sel.value) || null;
   }
-  const inArea = m => !area || (area.puntiIds || []).includes(m.destinazioneId);
+  // Filtro "Origine": menu dei punti; se è scelta un'area, propone solo i punti di quell'area.
+  const oSel = document.getElementById('ic-origine');
+  let origId = '';
+  if (oSel) {
+    const punti = (st.ubicazioni || []).filter(x => x.attivo !== false && (!area || (area.puntiIds || []).includes(x.id)))
+      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+    const cur = oSel.value;
+    oSel.innerHTML = '<option value="">Tutte le origini</option>' + punti.map(x => `<option value="${esc(x.id)}">${esc(x.nome)}</option>`).join('');
+    oSel.value = punti.some(x => x.id === cur) ? cur : '';
+    origId = oSel.value;
+  }
+  const inArea = m => (!area || (area.puntiIds || []).includes(m.destinazioneId)) && (!origId || m.origineId === origId);
 
   // Da prendere
   const avTutte = st.missioni.filter(m => m.stato === 'richiesta');
@@ -63,7 +74,7 @@ export function renderInCorso() {
 
   const nascoste = (avTutte.length - avMiss.length) + (tkTutte.length - tkMiss.length);
   const nEl = document.getElementById('ic-nascoste');
-  if (nEl) nEl.textContent = area && nascoste ? `Area "${area.nome}": ${nascoste} ${nascoste === 1 ? 'missione nascosta' : 'missioni nascoste'} (destinazione fuori area)` : '';
+  if (nEl) nEl.textContent = (area || origId) && nascoste ? `${nascoste} ${nascoste === 1 ? 'missione nascosta' : 'missioni nascoste'} dai filtri` : '';
 
   // Un'unica lista: prima le missioni LINEA BLU, poi tutto il resto; a parità
   // ordinata per anzianità. Prendere un elemento non lo sposta di posizione
@@ -82,7 +93,7 @@ export function renderInCorso() {
       <div class="statCard green"><div class="val">${tkMiss.length}</div><div class="lbl">In carico</div></div>`;
   }
 
-  if (!lista.length) { el.innerHTML = (area || fStato) ? '<div class="emptyState">Nessuna missione con questi filtri. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
+  if (!lista.length) { el.innerHTML = (area || fStato || origId) ? '<div class="emptyState">Nessuna missione con questi filtri. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
   el.innerHTML = lista.map(_card).join('');
 }
 
