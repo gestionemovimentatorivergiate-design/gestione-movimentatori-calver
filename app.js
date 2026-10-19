@@ -56,6 +56,8 @@ function showPage(id, btn) {
   currentPage = id;
   // Ricorda la scheda aperta: dopo un ricaricamento si torna qui
   try { if (currentUser) localStorage.setItem('paginaCorrente:' + currentUser.uid, id); } catch (e) {}
+  // ...e la scrive anche nell'indirizzo (#Scheda): sopravvive a qualsiasi ricaricamento
+  try { history.replaceState(null, '', '#' + id); } catch (e) { /* ignora */ }
   refreshCurrentPage();
 }
 window.showPage = showPage;
@@ -238,8 +240,8 @@ function showApp() {
   startListeners();
 
   // Riapre l'ultima scheda usata (se il ruolo la consente), altrimenti la prima disponibile
-  let saved = '';
-  try { saved = localStorage.getItem('paginaCorrente:' + currentUser.uid) || ''; } catch (e) {}
+  let saved = decodeURIComponent((location.hash || '').replace(/^#/, ''));          // 1) indirizzo (#Scheda)
+  if (!saved) { try { saved = localStorage.getItem('paginaCorrente:' + currentUser.uid) || ''; } catch (e) {} }   // 2) memoria del browser
   const savedBtn = [...document.querySelectorAll('.navBtn')].find(b => b.dataset.page === saved && !b.classList.contains('hidden'));
   const start = savedBtn || firstBtn;
   if (start) showPage(start.dataset.page, start);
