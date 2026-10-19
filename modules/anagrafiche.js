@@ -364,11 +364,12 @@ window.deleteUbicazione = async function (id, nome) {
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
 
-// ── AREE DI MOVIMENTAZIONE ──────────────────────────────────────────────────
-// Salvate in ubicazioni/{auto-id} con tipo: 'area' (così usano le regole già
-// esistenti, come i Building): { nome, tipo:'area', puntiIds:[id punti], attivo, createdAt }
-// Nel tab "In corso" l'utente sceglie un'area e vede solo le missioni la cui
-// destinazione è uno dei punti dell'area.
+// ── GRUPPI DI PUNTI: AREE DI MOVIMENTAZIONE e REPARTI ───────────────────────
+// Due anagrafiche con la stessa struttura (un nome + uno o più punti carico-scarico),
+// salvate in ubicazioni/{auto-id} con un 'tipo' (così usano le regole già esistenti,
+// come i Building): { nome, tipo:'area'|'reparto', puntiIds:[id punti], attivo, createdAt }
+//  • AREA di movimentazione → tab "In corso" e "Statistiche": filtro per DESTINAZIONE.
+//  • REPARTO               → tab "Prenotazioni": limita i punti di ORIGINE proposti.
 function _opzioniPunti(includiIds = []) {
   const st = _getState();
   return st.ubicazioni.filter(u => u.attivo !== false || includiIds.includes(u.id))
@@ -376,89 +377,107 @@ function _opzioniPunti(includiIds = []) {
     .map(u => ({ v: u.id, t: u.nome + (u.buildingId ? '  ·  ' + u.buildingId : '') }));
 }
 
-export function renderAree() {
-  const st = _getState();
-  // Elenco punti del form "nuova area": ridisegnato mantenendo le spunte e la ricerca
-  const box = document.getElementById('ar-checks');
-  if (box) {
-    const spunte = _checklistLeggi('ar-new', box);
-    const q = box.querySelector('input[type=text]')?.value || '';
-    box.innerHTML = _checklistHtml('ar-new', _opzioniPunti(), spunte);
-    const inp = box.querySelector('input[type=text]');
-    if (inp && q) { inp.value = q; window.filtraChecklist(inp); }
-  }
-  const el = document.getElementById('ar-list');
-  if (!el) return;
-  const list = [...st.aree].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
-  if (!list.length) { el.innerHTML = '<div class="emptyState">Nessuna area di movimentazione. Creane una sopra.</div>'; return; }
-  const uMap = {}; st.ubicazioni.forEach(u => { uMap[u.id] = u; });
-  el.innerHTML = list.map(a => {
-    const nomi = (a.puntiIds || []).map(i => uMap[i]?.nome).filter(Boolean);
-    const txt = nomi.slice(0, 6).join(', ') + (nomi.length > 6 ? ` … (+${nomi.length - 6})` : '');
-    return `
-    <div class="rowItem ${a.attivo === false ? 'off' : ''}">
-      <div class="rowMain">
-        <div class="rowTitle">${esc(a.nome)} ${a.attivo === false ? '<span class="pill off">disattivata</span>' : ''}</div>
-        <div class="rowSub">📍 ${nomi.length} ${nomi.length === 1 ? 'punto' : 'punti'}${txt ? ': ' + esc(txt) : ''}</div>
-      </div>
-      <button class="btnIcon" title="Modifica" onclick="renameArea('${esc(a.id)}')">✏️</button>
-      <button class="btnIcon" title="${a.attivo === false ? 'Riattiva' : 'Disattiva'}" onclick="toggleArea('${esc(a.id)}',${a.attivo === false})">${a.attivo === false ? '↩️' : '🚫'}</button>
-      <button class="btnIcon" title="Elimina" onclick="deleteArea('${esc(a.id)}')">🗑</button>
-    </div>`;
-  }).join('');
+// cfg: { tipo, stato (chiave in state), pre (prefisso id html), Nome (per le funzioni window),
+//        titoloModifica, labelNome, singolo ("l'area"/"il reparto"), art ("Area"/"Reparto") }
+function _gruppoPunti(cfg) {
+  const { tipo, stato, pre, Nome, titoloModifica, labelNome, singolo, art, plurale } = cfg;
+
+  const render = () => {
+    const st = _getState();
+    // Elenco punti del form "nuovo": ridisegnato mantenendo le spunte e la ricerca
+    const box = document.getElementById(pre + '-checks');
+    if (box) {
+      const spunte = _checklistLeggi(pre + '-new', box);
+      const q = box.querySelector('input[type=text]')?.value || '';
+      box.innerHTML = _checklistHtml(pre + '-new', _opzioniPunti(), spunte);
+      const inp = box.querySelector('input[type=text]');
+      if (inp && q) { inp.value = q; window.filtraChecklist(inp); }
+    }
+    const el = document.getElementById(pre + '-list');
+    if (!el) return;
+    const list = [...(st[stato] || [])].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+    if (!list.length) { el.innerHTML = `<div class="emptyState">Nessun ${art.toLowerCase()} creato. Creane uno sopra.</div>`; return; }
+    const uMap = {}; st.ubicazioni.forEach(u => { uMap[u.id] = u; });
+    el.innerHTML = list.map(a => {
+      const nomi = (a.puntiIds || []).map(i => uMap[i]?.nome).filter(Boolean);
+      const txt = nomi.slice(0, 6).join(', ') + (nomi.length > 6 ? ` … (+${nomi.length - 6})` : '');
+      return `
+      <div class="rowItem ${a.attivo === false ? 'off' : ''}">
+        <div class="rowMain">
+          <div class="rowTitle">${esc(a.nome)} ${a.attivo === false ? `<span class="pill off">disattivat${art === 'Area' ? 'a' : 'o'}</span>` : ''}</div>
+          <div class="rowSub">📍 ${nomi.length} ${nomi.length === 1 ? 'punto' : 'punti'}${txt ? ': ' + esc(txt) : ''}</div>
+        </div>
+        <button class="btnIcon" title="Modifica" onclick="rename${Nome}('${esc(a.id)}')">✏️</button>
+        <button class="btnIcon" title="${a.attivo === false ? 'Riattiva' : 'Disattiva'}" onclick="toggle${Nome}('${esc(a.id)}',${a.attivo === false})">${a.attivo === false ? '↩️' : '🚫'}</button>
+        <button class="btnIcon" title="Elimina" onclick="delete${Nome}('${esc(a.id)}')">🗑</button>
+      </div>`;
+    }).join('');
+  };
+
+  window['add' + Nome] = async function () {
+    if (!_requireAdmin()) return;
+    const nomeEl = document.getElementById(pre + '-nome');
+    const nome = (nomeEl.value || '').trim();
+    const puntiIds = _checklistLeggi(pre + '-new', document.getElementById(pre + '-checks'));
+    if (!nome) { showToast('Inserisci il nome.', 'error'); return; }
+    if (!puntiIds.length) { showToast('Seleziona almeno un punto carico-scarico.', 'error'); return; }
+    if ((_getState()[stato] || []).some(a => (a.nome || '').toLowerCase() === nome.toLowerCase())) { showToast(`${art} già esistente.`, 'error'); return; }
+    try {
+      await addDoc(collection(window.db, 'ubicazioni'), { nome, tipo, puntiIds, attivo: true, createdAt: serverTimestamp() });
+      nomeEl.value = '';
+      document.querySelectorAll('#' + pre + '-checks input[data-chk]').forEach(c => { c.checked = false; });
+      showToast(`${art} aggiunt${art === 'Area' ? 'a' : 'o'}.`, 'success');
+    } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+  };
+
+  window['rename' + Nome] = function (id) {
+    if (!_requireAdmin()) return;
+    const a = (_getState()[stato] || []).find(x => x.id === id);
+    if (!a) return;
+    _dialogModifica({
+      titolo: titoloModifica,
+      campi: [
+        { id: 'nome', label: labelNome, valore: a.nome },
+        { id: 'punti', label: 'Punti carico-scarico', tipo: 'checks', valore: a.puntiIds || [], opzioni: _opzioniPunti(a.puntiIds || []) },
+      ],
+      onSave: async v => {
+        if (!v.nome) throw new Error('Inserisci il nome.');
+        if (!v.punti.length) throw new Error('Seleziona almeno un punto carico-scarico.');
+        if ((_getState()[stato] || []).some(x => x.id !== id && (x.nome || '').toLowerCase() === v.nome.toLowerCase())) throw new Error(`${art} già esistente.`);
+        await updateDoc(doc(window.db, 'ubicazioni', id), { nome: v.nome, puntiIds: v.punti });
+        showToast(`${art} aggiornat${art === 'Area' ? 'a' : 'o'}.`, 'success');
+      },
+    });
+  };
+
+  window['toggle' + Nome] = async function (id, attiva) {
+    if (!_requireAdmin()) return;
+    try {
+      await updateDoc(doc(window.db, 'ubicazioni', id), { attivo: !!attiva });
+      const f = art === 'Area' ? 'a' : 'o';
+      showToast(`${art} ${attiva ? 'riattivat' : 'disattivat'}${f}.`, 'success');
+    } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+  };
+
+  window['delete' + Nome] = async function (id) {
+    if (!_requireAdmin()) return;
+    const a = (_getState()[stato] || []).find(x => x.id === id);
+    if (!a) return;
+    if (!confirm(`Eliminare ${singolo} "${a.nome}"? I punti carico-scarico non vengono toccati.`)) return;
+    try {
+      await deleteDoc(doc(window.db, 'ubicazioni', id));
+      showToast(`${art} eliminat${art === 'Area' ? 'a' : 'o'}.`, 'success');
+    } catch (e) { showToast('Errore: ' + e.message, 'error'); }
+  };
+
+  return render;
 }
 
-window.addArea = async function () {
-  if (!_requireAdmin()) return;
-  const nomeEl = document.getElementById('ar-nome');
-  const nome = (nomeEl.value || '').trim();
-  const puntiIds = _checklistLeggi('ar-new', document.getElementById('ar-checks'));
-  if (!nome) { showToast('Inserisci il nome dell\'area di movimentazione.', 'error'); return; }
-  if (!puntiIds.length) { showToast('Seleziona almeno un punto carico-scarico.', 'error'); return; }
-  if (_getState().aree.some(a => (a.nome || '').toLowerCase() === nome.toLowerCase())) { showToast('Area già esistente.', 'error'); return; }
-  try {
-    await addDoc(collection(window.db, 'ubicazioni'), { nome, tipo: 'area', puntiIds, attivo: true, createdAt: serverTimestamp() });
-    nomeEl.value = '';
-    document.querySelectorAll('#ar-checks input[data-chk]').forEach(c => { c.checked = false; });
-    showToast('Area di movimentazione aggiunta.', 'success');
-  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
-};
-
-window.renameArea = function (id) {
-  if (!_requireAdmin()) return;
-  const a = _getState().aree.find(x => x.id === id);
-  if (!a) return;
-  _dialogModifica({
-    titolo: 'Modifica area di movimentazione',
-    campi: [
-      { id: 'nome', label: 'Nome area di movimentazione', valore: a.nome },
-      { id: 'punti', label: 'Punti carico-scarico dell\'area', tipo: 'checks', valore: a.puntiIds || [], opzioni: _opzioniPunti(a.puntiIds || []) },
-    ],
-    onSave: async v => {
-      if (!v.nome) throw new Error('Inserisci il nome dell\'area.');
-      if (!v.punti.length) throw new Error('Seleziona almeno un punto carico-scarico.');
-      if (_getState().aree.some(x => x.id !== id && (x.nome || '').toLowerCase() === v.nome.toLowerCase())) throw new Error('Area già esistente.');
-      await updateDoc(doc(window.db, 'ubicazioni', id), { nome: v.nome, puntiIds: v.punti });
-      showToast('Area aggiornata.', 'success');
-    },
-  });
-};
-
-window.toggleArea = async function (id, attiva) {
-  if (!_requireAdmin()) return;
-  try {
-    await updateDoc(doc(window.db, 'ubicazioni', id), { attivo: !!attiva });
-    showToast(attiva ? 'Area riattivata.' : 'Area disattivata.', 'success');
-  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
-};
-
-window.deleteArea = async function (id) {
-  if (!_requireAdmin()) return;
-  const a = _getState().aree.find(x => x.id === id);
-  if (!a) return;
-  if (!confirm(`Eliminare l'area "${a.nome}"? I punti carico-scarico non vengono toccati.`)) return;
-  try {
-    await deleteDoc(doc(window.db, 'ubicazioni', id));
-    showToast('Area eliminata.', 'success');
-  } catch (e) { showToast('Errore: ' + e.message, 'error'); }
-};
+export const renderAree = _gruppoPunti({
+  tipo: 'area', stato: 'aree', pre: 'ar', Nome: 'Area', art: 'Area', singolo: "l'area",
+  titoloModifica: 'Modifica area di movimentazione', labelNome: 'Nome area di movimentazione',
+});
+export const renderReparti = _gruppoPunti({
+  tipo: 'reparto', stato: 'reparti', pre: 'rp', Nome: 'Reparto', art: 'Reparto', singolo: 'il reparto',
+  titoloModifica: 'Modifica reparto', labelNome: 'Nome reparto',
+});

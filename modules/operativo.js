@@ -32,6 +32,12 @@ export function initOperativo({ getState, getUser }) {
 }
 
 // ── NUOVA MISSIONE ────────────────────────────────────────────────────────────
+window.cambiaRepartoPren = function () {
+  const u = _getUser();
+  try { if (u) localStorage.setItem('repartoPren:' + u.uid, document.getElementById('nm-reparto')?.value || ''); } catch (e) {}
+  renderNuovaMissione();
+};
+
 export function renderNuovaMissione() {
   const st = _getState();
   const elSel = document.getElementById('nm-elemento');
@@ -47,10 +53,29 @@ export function renderNuovaMissione() {
   const ubicazioni = st.ubicazioni.filter(u => u.attivo !== false)
     .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
 
+  // Reparto: se scelto, l'ORIGINE propone solo i punti di quel reparto.
+  // La scelta resta memorizzata su questo dispositivo.
+  const repSel = document.getElementById('nm-reparto');
+  let reparto = null;
+  if (repSel) {
+    const u = _getUser();
+    let cur = repSel.value;
+    const reparti = (st.reparti || []).filter(r => r.attivo !== false)
+      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+    if (u && repSel.dataset.uid !== u.uid && reparti.length) {
+      repSel.dataset.uid = u.uid;
+      try { cur = localStorage.getItem('repartoPren:' + u.uid) || ''; } catch (e) { cur = ''; }
+    }
+    repSel.innerHTML = '<option value="">Tutti i reparti</option>' + reparti.map(r => `<option value="${esc(r.id)}">${esc(r.nome)}</option>`).join('');
+    repSel.value = reparti.some(r => r.id === cur) ? cur : '';
+    reparto = reparti.find(r => r.id === repSel.value) || null;
+  }
+  const origini = reparto ? ubicazioni.filter(u => (reparto.puntiIds || []).includes(u.id)) : ubicazioni;
+
   elSel.innerHTML = '<option value="">— seleziona —</option>' +
     elementi.map(e => `<option value="${e.id}">${esc(e.codice)}</option>`).join('');
   orSel.innerHTML = '<option value="">— seleziona —</option>' +
-    ubicazioni.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
+    origini.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
   deSel.innerHTML = '<option value="">— seleziona —</option>' +
     ubicazioni.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
 
