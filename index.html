@@ -144,6 +144,8 @@
     <div class="filterBar" style="align-items:flex-end;margin-bottom:10px">
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Area di movimentazione</div>
         <select id="ic-area" onchange="cambiaAreaInCorso()" style="min-width:220px"><option value="">Tutte le aree</option></select></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Stato</div>
+        <select id="ic-stato" onchange="renderInCorso()"><option value="">Tutti</option><option value="aperta">Aperta</option><option value="carico">In carico</option></select></div>
     </div>
     <div class="pageSubtitle" id="ic-nascoste" style="margin-top:-2px"></div>
     <div class="statsRow" id="incorso-stats"></div>
