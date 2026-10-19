@@ -45,13 +45,15 @@ export function renderStorico() {
   const fUt  = fill('st-utente',   H.map(utente),        'Tutti');
   const fPer = fill('st-percorso', H.map(percorso),      'Tutti');
   const fEl  = fill('st-elemento', H.map(h => h.elemento), 'Tutti');
+  const fPar = fill('st-partenza', H.map(h => h.origine),      'Tutti');
+  const fArr = fill('st-arrivo',   H.map(h => h.destinazione), 'Tutti');
   const fData = document.getElementById('st-data')?.value || '';          // aaaa-mm-gg
   const fId = (document.getElementById('st-id')?.value || '').trim().toLowerCase();
   const giorno = h => h.ts ? h.ts.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }) : '';
 
   // Nessun filtro attivo → si mostrano solo i movimenti dell'ultima settimana.
   // Con almeno un filtro attivo la ricerca copre tutte le voci caricate.
-  const nessunFiltro = !fAz && !fUt && !fPer && !fEl && !fData && !fId;
+  const nessunFiltro = !fAz && !fUt && !fPer && !fPar && !fArr && !fEl && !fData && !fId;
   const da = Date.now() - 7 * 24 * 3600 * 1000;
 
   // Una missione compare se almeno una sua voce rispetta TUTTI i filtri (AND);
@@ -70,6 +72,8 @@ export function renderStorico() {
     (!fAz  || stato(ultimo.get(chiave(h)) || h) === fAz) &&
     (!fUt  || utente(h) === fUt) &&
     (!fPer || percorso(h) === fPer) &&
+    (!fPar || h.origine === fPar) &&
+    (!fArr || h.destinazione === fArr) &&
     (!fEl  || h.elemento === fEl) &&
     (!fData || giorno(h) === fData) &&
     (!fId  || (h.codice || '').toLowerCase().includes(fId))).map(chiave));
@@ -694,7 +698,7 @@ window.scaricaStoricoExcel = function () {
 };
 
 window.resetFiltriStorico = function () {
-  ['st-data', 'st-id', 'st-utente', 'st-percorso', 'st-elemento', 'st-azione'].forEach(id => {
+  ['st-data', 'st-id', 'st-utente', 'st-percorso', 'st-partenza', 'st-arrivo', 'st-elemento', 'st-azione'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   renderStorico();
