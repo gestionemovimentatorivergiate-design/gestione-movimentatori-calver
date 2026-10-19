@@ -246,7 +246,7 @@ async function _avviaScanner(video, onCode) {
     lib = await import('https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/+esm');
   } catch (e) {
     _fermaScanner();
-    throw new Error('Scanner non disponibile (libreria non caricata): usa la selezione manuale.');
+    throw new Error('Scanner non disponibile (libreria non caricata): riprova più tardi.');
   }
   const reader = new lib.BrowserMultiFormatReader();
   controlli = await reader.decodeFromStream(stream, video, (res) => {
@@ -297,9 +297,8 @@ window.confermaMissione = function (id) {
     </div>` : ''}
     <div id="cd-msg" style="display:none;margin-top:10px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600"></div>
 
-    ${mobile ? `<div style="display:flex;align-items:center;gap:10px;margin:16px 0 10px;color:var(--muted);font-size:12px;font-weight:700">
-      <div style="flex:1;height:1px;background:var(--border)"></div>OPPURE A MANO<div style="flex:1;height:1px;background:var(--border)"></div></div>` : ''}
-    <div class="field" style="${mobile ? '' : 'margin-top:14px'}"><label>Punto di consegna</label>
+    ${mobile ? `<div style="margin-top:12px;font-size:12px;color:var(--muted);text-align:center">Da telefono la consegna si conferma solo scansionando il barcode del punto di destinazione.</div>` : `
+    <div class="field" style="margin-top:14px"><label>Punto di consegna</label>
       <input type="text" id="cd-txt" placeholder="Scrivi per cercare o scegli dall'elenco" autocomplete="off" spellcheck="false">
       <div id="cd-lista" style="max-height:210px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:4px;background:var(--surface);margin-top:6px">
         ${punti.map(x => `<div class="cdRow" data-id="${esc(x.id)}" data-t="${esc((x.nome + ' ' + etichetta(x)).toLowerCase())}" style="padding:9px 12px;border-radius:8px;cursor:pointer;border:1.5px solid transparent">
@@ -308,6 +307,7 @@ window.confermaMissione = function (id) {
         <div id="cd-vuoto" style="display:none;padding:10px;color:var(--muted);font-size:13px">Nessun punto trovato.</div>
       </div></div>
     <button class="btnGreen" id="cd-manuale" style="width:100%">✅ Conferma manualmente</button>
+    `}
     <div class="modalActions"><button class="btnGray" id="cd-chiudi">Annulla</button></div>
   </div>`;
   document.body.appendChild(ov);
@@ -325,7 +325,7 @@ window.confermaMissione = function (id) {
       return;
     }
     inCorso = true; _fermaScanner();
-    $('cd-manuale').disabled = true; if ($('cd-scan')) $('cd-scan').disabled = true;
+    if ($('cd-manuale')) $('cd-manuale').disabled = true; if ($('cd-scan')) $('cd-scan').disabled = true;
     try {
       await _conferma('missioni', id, 'in_transito', 'consegnata', 'consegnataAt', {
         consegnaMetodo: metodo, consegnaPuntoId: ub.id, consegnaPuntoNome: ub.nome,
@@ -339,7 +339,7 @@ window.confermaMissione = function (id) {
       showToast('Consegna confermata.', 'success');
     } catch (e) {
       inCorso = false;
-      $('cd-manuale').disabled = false; if ($('cd-scan')) $('cd-scan').disabled = false;
+      if ($('cd-manuale')) $('cd-manuale').disabled = false; if ($('cd-scan')) $('cd-scan').disabled = false;
       msg(e.message || 'Errore', false);
     }
   };
@@ -367,37 +367,39 @@ window.confermaMissione = function (id) {
       }
     };
   }
-  // Elenco punti: filtro mentre si scrive, selezione con un tocco
-  let scelto = '';
-  const righe = [...ov.querySelectorAll('.cdRow')];
-  const evidenzia = () => righe.forEach(r => {
-    const on = r.dataset.id === scelto;
-    r.style.background = on ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : '';
-    r.style.borderColor = on ? 'var(--accent2)' : 'transparent';
-  });
-  const filtra = () => {
-    const q = $('cd-txt').value.trim().toLowerCase();
-    let n = 0;
-    righe.forEach(r => { const v = !q || r.dataset.t.includes(q); r.style.display = v ? '' : 'none'; if (v) n++; });
-    $('cd-vuoto').style.display = n ? 'none' : 'block';
-  };
-  righe.forEach(r => r.onclick = () => {
-    scelto = r.dataset.id;
-    $('cd-txt').value = st.ubicazioni.find(x => x.id === scelto)?.nome || '';
-    evidenzia();
-  });
-  $('cd-txt').addEventListener('input', () => { scelto = ''; evidenzia(); filtra(); });
-  $('cd-manuale').onclick = () => {
-    let ub = scelto ? st.ubicazioni.find(x => x.id === scelto) : null;
-    if (!ub) {
-      const v = _norm($('cd-txt').value);
-      if (!v) { msg('Scegli o scrivi il punto di consegna.', false); return; }
-      ub = st.ubicazioni.find(x => _norm(x.nome) === v || _norm(x.id) === v);
-      if (!ub) { msg('Punto non trovato: scegli un punto dall\'elenco.', false); return; }
-    }
-    conferma(ub, 'manuale');
-  };
-  // Invio dalla tastiera (PC)
-  $('cd-txt')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('cd-manuale').click(); });
-  if (!mobile) setTimeout(() => $('cd-txt')?.focus(), 50);   // su telefono non si apre la tastiera da sola
+  if (!mobile) {   // la conferma manuale esiste solo da PC
+    // Elenco punti: filtro mentre si scrive, selezione con un tocco
+    let scelto = '';
+    const righe = [...ov.querySelectorAll('.cdRow')];
+    const evidenzia = () => righe.forEach(r => {
+      const on = r.dataset.id === scelto;
+      r.style.background = on ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : '';
+      r.style.borderColor = on ? 'var(--accent2)' : 'transparent';
+    });
+    const filtra = () => {
+      const q = $('cd-txt').value.trim().toLowerCase();
+      let n = 0;
+      righe.forEach(r => { const v = !q || r.dataset.t.includes(q); r.style.display = v ? '' : 'none'; if (v) n++; });
+      $('cd-vuoto').style.display = n ? 'none' : 'block';
+    };
+    righe.forEach(r => r.onclick = () => {
+      scelto = r.dataset.id;
+      $('cd-txt').value = st.ubicazioni.find(x => x.id === scelto)?.nome || '';
+      evidenzia();
+    });
+    $('cd-txt').addEventListener('input', () => { scelto = ''; evidenzia(); filtra(); });
+    $('cd-manuale').onclick = () => {
+      let ub = scelto ? st.ubicazioni.find(x => x.id === scelto) : null;
+      if (!ub) {
+        const v = _norm($('cd-txt').value);
+        if (!v) { msg('Scegli o scrivi il punto di consegna.', false); return; }
+        ub = st.ubicazioni.find(x => _norm(x.nome) === v || _norm(x.id) === v);
+        if (!ub) { msg('Punto non trovato: scegli un punto dall\'elenco.', false); return; }
+      }
+      conferma(ub, 'manuale');
+    };
+    // Invio dalla tastiera (PC)
+    $('cd-txt')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('cd-manuale').click(); });
+    setTimeout(() => $('cd-txt')?.focus(), 50);
+  }
 };
