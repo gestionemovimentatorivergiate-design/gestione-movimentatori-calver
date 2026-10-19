@@ -116,6 +116,10 @@
     <div class="card">
       <div class="cardTitle">Nuova missione</div>
       <div class="field">
+        <label>Reparto <span class="opt">(filtra l'origine)</span></label>
+        <select id="nm-reparto" onchange="cambiaRepartoPren()"><option value="">Tutti i reparti</option></select>
+      </div>
+      <div class="field">
         <label>Elemento da spostare</label>
         <select id="nm-elemento"><option value="">— seleziona —</option></select>
       </div>
@@ -227,7 +231,7 @@
   <!-- ── PAGINA: ANAGRAFICHE (amministratore) ────────────────────────────────── -->
   <div class="page" id="pageAnagrafiche">
     <div class="pageHeader">Anagrafiche</div>
-    <div class="pageSubtitle">Elementi, building, punti carico-scarico e aree di movimentazione — modificabili in qualsiasi momento</div>
+    <div class="pageSubtitle">Elementi, building, punti carico-scarico, aree di movimentazione e reparti — modificabili in qualsiasi momento</div>
 
     <div class="card">
       <div class="cardTitle">Elementi</div>
@@ -269,6 +273,17 @@
       </div>
       <div class="field"><label>Punti carico-scarico dell'area (uno o più)</label><div id="ar-checks"></div></div>
       <div id="ar-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="cardTitle">Reparti</div>
+      <div class="pageSubtitle" style="margin-top:-6px;margin-bottom:10px">In Prenotazioni, scegliendo un reparto l'origine propone solo i suoi punti.</div>
+      <div class="field" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <input type="text" id="rp-nome" placeholder="Nome reparto" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')addReparto()">
+        <button class="btnGreen btnSmall" onclick="addReparto()">+ Aggiungi</button>
+      </div>
+      <div class="field"><label>Punti carico-scarico del reparto (uno o più)</label><div id="rp-checks"></div></div>
+      <div id="rp-list"></div>
     </div>
   </div>
 

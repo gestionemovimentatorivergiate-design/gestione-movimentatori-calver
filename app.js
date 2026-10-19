@@ -20,7 +20,7 @@ import {
 import { showToast } from './shared-utils.js';
 import { initOperativo, renderNuovaMissione, renderMieMissioni } from './modules/operativo.js';
 import { initNavetta, renderInCorso } from './modules/navetta.js';
-import { initAnagrafiche, renderElementi, renderUbicazioni, renderBuildings, renderAree } from './modules/anagrafiche.js';
+import { initAnagrafiche, renderElementi, renderUbicazioni, renderBuildings, renderAree, renderReparti } from './modules/anagrafiche.js';
 import { initAdmin, renderStorico, renderStatistiche, renderUtenti } from './modules/admin.js';
 
 // ── STATO CONDIVISO ─────────────────────────────────────────────────────────
@@ -33,6 +33,7 @@ const state = {
   buildings: [],
   ubicazioni: [],
   aree: [],
+  reparti: [],
   history: [],
   historyLimit: HISTORY_LIMIT,
   utenti: [],
@@ -69,7 +70,7 @@ function refreshCurrentPage() {
     case 'InCorso':       renderInCorso();       break;
     case 'Storico':       renderStorico();       break;
     case 'Statistiche':   renderStatistiche();   break;
-    case 'Anagrafiche':   renderElementi(); renderBuildings(); renderUbicazioni(); renderAree(); break;
+    case 'Anagrafiche':   renderElementi(); renderBuildings(); renderUbicazioni(); renderAree(); renderReparti(); break;
     case 'Utenti':        renderUtenti();        break;
   }
 }
@@ -106,7 +107,8 @@ function startListeners() {
       // Anche le Aree di movimentazione (tipo: 'area') vivono in questa collezione.
       state.buildings  = all.filter(x => x.tipo === 'building');
       state.aree       = all.filter(x => x.tipo === 'area');
-      state.ubicazioni = all.filter(x => x.tipo !== 'building' && x.tipo !== 'area');
+      state.reparti    = all.filter(x => x.tipo === 'reparto');
+      state.ubicazioni = all.filter(x => !['building', 'area', 'reparto'].includes(x.tipo));
       refreshCurrentPage();
     },
     err => console.error('Errore ubicazioni:', err)));
