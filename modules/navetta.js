@@ -82,7 +82,9 @@ export function renderInCorso() {
   // Filtro per stato: Aperta (da prendere) / In carico
   const fStato = document.getElementById('ic-stato')?.value || '';
   const lista = (fStato === 'aperta' ? avMiss : fStato === 'carico' ? tkMiss : avMiss.concat(tkMiss))
-    .sort((a, b) => ((b.lineaBlu || b.lineaRossa) ? 1 : 0) - ((a.lineaBlu || a.lineaRossa) ? 1 : 0)
+    .sort((a, b) => (a._avail ? 1 : 0) - (b._avail ? 1 : 0)            // prima le prese in carico
+                 || (!a._avail ? _presa(b) - _presa(a) : 0) // l'ultima presa in cima
+                 || ((b.lineaBlu || b.lineaRossa) ? 1 : 0) - ((a.lineaBlu || a.lineaRossa) ? 1 : 0)
                  || tsVal(a.createdAt) - tsVal(b.createdAt));
 
   // Statistiche
@@ -96,6 +98,9 @@ export function renderInCorso() {
   if (!lista.length) { el.innerHTML = (area || fStato || origId) ? '<div class="emptyState">Nessuna missione con questi filtri. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
   el.innerHTML = lista.map(_card).join('');
 }
+
+// Ora di presa in carico; se il server non ha ancora risposto (valore nullo) è la più recente.
+function _presa(m) { return m.presaInCaricoAt ? tsVal(m.presaInCaricoAt) : Date.now() + 1e9; }
 
 window.renderInCorso = renderInCorso;
 window.cambiaAreaInCorso = function () {
