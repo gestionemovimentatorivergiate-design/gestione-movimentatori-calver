@@ -148,6 +148,7 @@ function _azBadge(a) {
     'Missione modificata':  'blue',
     'Missione annullata':   'red',
     'Storico eliminato':    'red',
+    'Statistiche azzerate': 'red',
   };
   const color = map[a] || 'muted';
   const bg = { blue: '#3b82f613;color:#1d4ed8', orange: '#f59e0b13;color:#b45309', green: '#A4D20018;color:#7fa000', red: '#ef444413;color:#dc2626', muted: 'transparent;color:#6b7280' }[color];
@@ -170,6 +171,9 @@ export function renderStatistiche() {
   const st = _getState();
   const cards = document.getElementById('stat-cards');
   if (!cards) return;
+  // Pulsante "Azzera statistiche": visibile solo all'amministratore
+  const btnAz = document.getElementById('ss-azzera');
+  if (btnAz) btnAz.style.display = (_getUser()?.role === 'amministratore') ? 'inline-flex' : 'none';
 
   const ubMap = {}; st.ubicazioni.forEach(u => { ubMap[u.id] = u; });
   const bMap = {};  st.buildings.forEach(b => { bMap[b.id] = b; });
@@ -470,20 +474,28 @@ window.renderStorico = renderStorico;
 // Finestra di conferma nello stile delle altre finestre dell'app: per procedere
 // bisogna scrivere ELIMINA (il bottone resta disattivato finché non è corretto).
 function _dialogEliminaStorico(quanti) {
+  return _dialogDistruttiva({
+    titolo: 'Elimina dati storici',
+    avviso: `⚠️ Verranno cancellati tutti i movimenti registrati${quanti ? ` (${quanti} voci caricate)` : ''}. L'operazione NON si può annullare.`,
+    parola: 'ELIMINA', okLabel: '🗑 Elimina tutto',
+  });
+}
+
+function _dialogDistruttiva({ titolo, avviso, parola, okLabel }) {
   return new Promise(resolve => {
     document.getElementById('modalEliminaStorico')?.remove();
     const ov = document.createElement('div');
     ov.className = 'modalOverlay open';
     ov.id = 'modalEliminaStorico';
     ov.innerHTML = `<div class="modalBox">
-      <h3>Elimina dati storici</h3>
+      <h3>${titolo}</h3>
       <div style="padding:10px 12px;border-radius:8px;background:#dc262618;color:#b91c1c;font-size:13px;font-weight:600;margin-bottom:12px">
-        ⚠️ Verranno cancellati tutti i movimenti registrati${quanti ? ` (${quanti} voci caricate)` : ''}. L'operazione NON si può annullare.</div>
-      <div class="field"><label>Per confermare scrivi ELIMINA</label>
-        <input type="text" id="es-conf" placeholder="ELIMINA" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+        ${avviso}</div>
+      <div class="field"><label>Per confermare scrivi ${parola}</label>
+        <input type="text" id="es-conf" placeholder="${parola}" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
       <div class="modalActions">
         <button class="btnGray" id="es-back">Annulla</button>
-        <button class="btnRed" id="es-ok" disabled style="opacity:.45">🗑 Elimina tutto</button>
+        <button class="btnRed" id="es-ok" disabled style="opacity:.45">${okLabel}</button>
       </div></div>`;
     document.body.appendChild(ov);
     const chiudi = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
@@ -491,7 +503,7 @@ function _dialogEliminaStorico(quanti) {
     document.addEventListener('keydown', onKey);
     ov.onclick = e => { if (e.target === ov) chiudi(false); };
     const inp = document.getElementById('es-conf'), ok = document.getElementById('es-ok');
-    const valido = () => inp.value.trim() === 'ELIMINA';
+    const valido = () => inp.value.trim() === parola;
     inp.addEventListener('input', () => { ok.disabled = !valido(); ok.style.opacity = valido() ? '1' : '.45'; });
     inp.addEventListener('keydown', e => { if (e.key === 'Enter' && valido()) chiudi(true); });
     document.getElementById('es-back').onclick = () => chiudi(false);
@@ -499,6 +511,42 @@ function _dialogEliminaStorico(quanti) {
     inp.focus();
   });
 }
+
+// ── Azzera statistiche (solo amministratore) ────────────────────────────────
+// Le statistiche si calcolano sulle missioni: azzerarle = eliminare le missioni
+// CONCLUSE (consegnate e annullate). Restano le missioni ancora aperte (in
+// coda / in carico) e i contatori giornalieri degli ID, così la numerazione
+// non riparte da capo. Lo storico (tab Storico) non viene toccato.
+window.azzeraStatistiche = async function () {
+  const u = _getUser();
+  if (!u || u.role !== 'amministratore') { showToast('Solo un amministratore può azzerare le statistiche.', 'error'); return; }
+  const chiuse = (_getState().missioni || []).filter(m => m.stato === 'consegnata' || m.stato === 'annullata');
+  const aperte = (_getState().missioni || []).filter(m => m.stato === 'richiesta' || m.stato === 'in_transito').length;
+  if (!chiuse.length) { showToast('Nessuna missione conclusa da eliminare: le statistiche sono già a zero.', 'success'); return; }
+  const ok = await _dialogDistruttiva({
+    titolo: 'Azzera statistiche',
+    avviso: `⚠️ Verranno eliminate ${chiuse.length} missioni concluse (consegnate e annullate) e le statistiche ripartiranno da zero.`
+      + (aperte ? ` Le ${aperte} missioni ancora aperte (in coda o in carico) restano.` : '')
+      + ` L'operazione NON si può annullare.`,
+    parola: 'AZZERA', okLabel: '🗑 Azzera statistiche',
+  });
+  if (!ok) return;
+  const btn = document.getElementById('ss-azzera');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Azzeramento…'; }
+  try {
+    for (let i = 0; i < chiuse.length; i += 400) {
+      const batch = writeBatch(window.db);
+      chiuse.slice(i, i + 400).forEach(m => batch.delete(doc(window.db, 'missioni', m.id)));
+      await batch.commit();
+    }
+    await window.logHistory({ action: 'Statistiche azzerate', voci: chiuse.length });
+    showToast(`Statistiche azzerate (${chiuse.length} missioni eliminate).`, 'success');
+  } catch (e) {
+    showToast('Errore: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗑 Azzera statistiche'; }
+  }
+};
 
 window.eliminaStorico = async function () {
   const u = _getUser();
