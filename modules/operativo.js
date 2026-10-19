@@ -423,13 +423,45 @@ window.modificaMissione = function (id) {
 };
 
 // ── AZIONE: annulla missione (solo 'richiesta', solo l'utente che l'ha creata) ────────────────
+// Finestra di conferma nello stile delle altre finestre dell'app (al posto del confirm() del browser).
+// Restituisce una Promise<boolean>.
+function _dialogConferma({ titolo, corpo, okLabel, backLabel, danger }) {
+  return new Promise(resolve => {
+    document.getElementById('modalConferma')?.remove();
+    const ov = document.createElement('div');
+    ov.className = 'modalOverlay open';
+    ov.id = 'modalConferma';
+    ov.innerHTML = `<div class="modalBox">
+      <h3>${esc(titolo)}</h3>${corpo}
+      <div class="modalActions">
+        <button class="btnGray" id="mc-back">${esc(backLabel || 'Indietro')}</button>
+        <button class="${danger ? 'btnRed' : 'btnGreen'}" id="mc-ok">${okLabel}</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const chiudi = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') chiudi(false); };
+    document.addEventListener('keydown', onKey);
+    ov.onclick = e => { if (e.target === ov) chiudi(false); };
+    document.getElementById('mc-back').onclick = () => chiudi(false);
+    document.getElementById('mc-ok').onclick = () => chiudi(true);
+    document.getElementById('mc-back').focus();
+  });
+}
+
 window.annullaMissione = async function (id) {
   const u = _getUser();
   const m = _getState().missioni.find(x => x.id === id);
   if (!m) return;
   if (m.stato !== 'richiesta') { showToast('Annullabile solo finché è in attesa.', 'error'); return; }
   if (m.ownerUid !== u.uid) { showToast('Puoi annullare solo le tue missioni.', 'error'); return; }
-  if (!confirm(`Annullare la missione ${m.elementoCodice} → ${m.destinazioneNome}?`)) return;
+  const ok = await _dialogConferma({
+    titolo: 'Annulla missione' + (m.codice ? ' ' + m.codice : ''),
+    corpo: `<div style="font-size:15px;font-weight:700;margin-bottom:6px">${esc(m.elementoCodice)}</div>
+      <div class="mRoute" style="margin-bottom:10px"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
+      <div style="font-size:13px;color:var(--muted)">La missione verrà annullata e non sarà più disponibile per i movimentatori. L'operazione non si può annullare.</div>`,
+    okLabel: '✕ Annulla missione', backLabel: 'Indietro', danger: true,
+  });
+  if (!ok) return;
   try {
     await updateDoc(doc(window.db, 'missioni', id), { stato: 'annullata', annullataAt: serverTimestamp() });
     await window.logHistory({ action: 'Missione annullata', codice: m.codice || null, elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
