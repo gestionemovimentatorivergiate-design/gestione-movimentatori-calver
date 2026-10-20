@@ -11,7 +11,7 @@ import {
   doc, getDoc, setDoc, updateDoc, deleteDoc,
   collection, getDocs, query, limit, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { showToast, esc, fmtDate, tsVal } from '../shared-utils.js';
+import { showToast, esc, fmtDate, tsVal, dialogElimina } from '../shared-utils.js';
 
 let _getState, _getUser;
 
@@ -545,7 +545,7 @@ window.changeRole = async function (uid, role) {
 };
 
 window.deleteUser = async function (uid, nome) {
-  if (!confirm(`Eliminare l'utente "${nome}"? Rimuove il profilo (non l'account di autenticazione).`)) return;
+  if (!await dialogElimina({ titolo: 'Elimina utente', nome, nota: "Rimuove il profilo (non l'account di autenticazione)." })) return;
   try {
     const snap = await getDoc(doc(window.db, 'users', uid));
     const uname = snap.exists() ? snap.data().username : null;

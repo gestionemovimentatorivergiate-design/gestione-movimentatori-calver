@@ -19,7 +19,7 @@
 import {
   addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { showToast, esc } from '../shared-utils.js';
+import { showToast, esc, dialogElimina } from '../shared-utils.js';
 
 let _getState, _getUser;
 
@@ -171,7 +171,7 @@ window.toggleElemento = async function (id, attiva) {
 
 window.deleteElemento = async function (id, codice) {
   if (!_requireAdmin()) return;
-  if (!confirm(`Eliminare l'elemento "${codice}"? Meglio disattivarlo se ha uno storico.`)) return;
+  if (!await dialogElimina({ titolo: 'Elimina elemento', nome: codice, nota: 'Meglio disattivarlo se ha uno storico.' })) return;
   try {
     await deleteDoc(doc(window.db, 'elementi', id));
     showToast('Elemento eliminato.', 'success');
@@ -266,7 +266,7 @@ window.deleteBuilding = async function (id) {
   if (!b) return;
   const usate = _getState().ubicazioni.filter(u => u.buildingId === id).length;
   if (usate) { showToast(`Building usato da ${usate} punti carico-scarico: disattivalo invece di eliminarlo.`, 'error'); return; }
-  if (!confirm(`Eliminare il building "${b.id} · ${b.nome}"?`)) return;
+  if (!await dialogElimina({ titolo: 'Elimina building', nome: `${b.id} · ${b.nome}` })) return;
   try {
     await deleteDoc(doc(window.db, 'ubicazioni', id));
     showToast('Building eliminato.', 'success');
@@ -357,7 +357,7 @@ window.toggleUbicazione = async function (id, attiva) {
 
 window.deleteUbicazione = async function (id, nome) {
   if (!_requireAdmin()) return;
-  if (!confirm(`Eliminare il punto carico-scarico "${nome}"? Meglio disattivarlo se ha uno storico.`)) return;
+  if (!await dialogElimina({ titolo: 'Elimina punto carico-scarico', nome, nota: 'Meglio disattivarlo se ha uno storico.' })) return;
   try {
     await deleteDoc(doc(window.db, 'ubicazioni', id));
     showToast('Punto carico-scarico eliminato.', 'success');
@@ -463,7 +463,7 @@ function _gruppoPunti(cfg) {
     if (!_requireAdmin()) return;
     const a = (_getState()[stato] || []).find(x => x.id === id);
     if (!a) return;
-    if (!confirm(`Eliminare ${singolo} "${a.nome}"? I punti carico-scarico non vengono toccati.`)) return;
+    if (!await dialogElimina({ titolo: 'Elimina ' + singolo.replace(/^l['’]/, '').replace(/^il /, ''), nome: a.nome, nota: 'I punti carico-scarico non vengono toccati.' })) return;
     try {
       await deleteDoc(doc(window.db, 'ubicazioni', id));
       showToast(`${art} eliminat${art === 'Area' ? 'a' : 'o'}.`, 'success');
