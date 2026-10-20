@@ -380,25 +380,49 @@ export function renderStatistiche() {
   grafico('stat-tempi-blu',   '🔵 Linea Blu',   '#2563eb',     (!G.tipo.length || G.tipo.includes('lineaBlu'))   ? T.M.filter(m => m.lineaBlu)   : []);
   grafico('stat-tempi-rossa', '🔴 Linea Rossa', '#dc2626',     (!G.tipo.length || G.tipo.includes('lineaRossa')) ? T.M.filter(m => m.lineaRossa) : []);
 
-  // Grafici a linea: tempo medio di completamento (Creata → Consegna) per giorno di consegna
+  // Grafici a linea: tempo medio per passaggio di stato, un giorno per punto, una settimana alla volta
+  const PASSI = [
+    { v: 'cp', l: 'Creata → Presa',     da: 'createdAt',      a: 'presaInCaricoAt', dash: '6 4' },
+    { v: 'pc', l: 'Presa → Consegna',   da: 'presaInCaricoAt', a: 'consegnataAt',    dash: '2 4' },
+    { v: 'cc', l: 'Creata → Consegna',  da: 'createdAt',      a: 'consegnataAt',    dash: '' },
+  ];
+  const selPassi = _msFill('sl-l-pass', [{ items: PASSI.map(x => ({ v: x.v, l: x.l })) }], 'Creata → Consegna');
+  const passiAtt = PASSI.filter(x => selPassi.length ? selPassi.includes(x.v) : x.v === 'cc');
+  // Settimane (lunedì → domenica) in cui esistono dati, dalla più recente
+  const lunedi = g => { const d = new Date(g + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+  const aggiungiGg = (g, n) => { const d = new Date(g + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const settimane = new Set();
+  T.M.forEach(m => PASSI.forEach(x => { if (diff(m, x.da, x.a) != null) settimane.add(lunedi(_gg(tsVal(m[x.a])))); }));
+  const wList = [...settimane].sort().reverse();
+  const wSel = document.getElementById('sl-l-week');
+  let weekIni = '';
+  if (wSel) {
+    const cur = wSel.value;
+    wSel.innerHTML = wList.length ? wList.map(w => `<option value="${w}">${_ggIt(w).slice(0, 5)} – ${_ggIt(aggiungiGg(w, 6))}</option>`).join('')
+                                  : '<option value="">Nessun dato</option>';
+    wSel.value = wList.includes(cur) ? cur : (wList[0] || '');
+    weekIni = wSel.value;
+  }
   const lineaGrafico = (elId, titolo, colTit, colLinea, arr) => {
     const el = document.getElementById(elId); if (!el) return;
-    const perGiorno = {};
-    arr.forEach(m => {
-      const d = diff(m, 'createdAt', 'consegnataAt'); if (d == null) return;
-      const g = _gg(tsVal(m.consegnataAt)); if (!g) return;
-      (perGiorno[g] = perGiorno[g] || []).push(d);
+    const giorniW = weekIni ? Array.from({ length: 7 }, (_, i) => aggiungiGg(weekIni, i)) : [];
+    // serie: per ogni passaggio, media per giorno (giorno dell'evento finale) dentro la settimana
+    const serie = passiAtt.map(x => {
+      const pg = {};
+      arr.forEach(m => {
+        const d = diff(m, x.da, x.a); if (d == null) return;
+        const g = _gg(tsVal(m[x.a])); if (!giorniW.includes(g)) return;
+        (pg[g] = pg[g] || []).push(d);
+      });
+      return { x, pts: giorniW.filter(g => pg[g]).map(g => ({ g, ms: pg[g].reduce((p, q) => p + q, 0) / pg[g].length, n: pg[g].length })) };
     });
-    const giorni = Object.keys(perGiorno).sort();
-    const testa = `<div style="text-align:center;font-weight:800;font-size:13px;color:${colTit};margin-bottom:6px">${titolo} <span style="color:var(--muted);font-weight:600">(${giorni.reduce((n, g) => n + perGiorno[g].length, 0)})</span></div>`;
-    if (!giorni.length) { el.innerHTML = testa + '<div style="height:150px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">Nessun dato</div>'; return; }
-    const pts = giorni.map(g => ({ g, ms: perGiorno[g].reduce((x, y) => x + y, 0) / perGiorno[g].length, n: perGiorno[g].length }));
-    const W = 320, H = 170, L = 56, R = 20, T = 12, B = 30;
-    const t0 = Date.parse(giorni[0] + 'T12:00:00Z'), t1 = Date.parse(giorni[giorni.length - 1] + 'T12:00:00Z');
-    const span = Math.max(t1 - t0, 1);
-    const X = g => pts.length === 1 ? (L + W - R) / 2 : L + (Date.parse(g + 'T12:00:00Z') - t0) / span * (W - L - R);
-    const maxMs = Math.max(...pts.map(q => q.ms), 1);
-    const Y = ms => T + (1 - ms / maxMs) * (H - T - B);
+    const nMiss = new Set(arr.filter(m => passiAtt.some(x => { const d = diff(m, x.da, x.a); return d != null && giorniW.includes(_gg(tsVal(m[x.a]))); })).map(m => m.id)).size;
+    const testa = `<div style="text-align:center;font-weight:800;font-size:13px;color:${colTit};margin-bottom:6px">${titolo} <span style="color:var(--muted);font-weight:600">(${nMiss})</span></div>`;
+    if (!serie.some(q => q.pts.length)) { el.innerHTML = testa + '<div style="height:150px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">Nessun dato in questa settimana</div>'; return; }
+    const W = 320, H = 170, L = 56, R = 20, T0 = 12, B = 30;
+    const X = g => L + giorniW.indexOf(g) / 6 * (W - L - R);
+    const maxMs = Math.max(...serie.flatMap(q => q.pts.map(p => p.ms)), 1);
+    const Y = ms => T0 + (1 - ms / maxMs) * (H - T0 - B);
     const dm = g => g.slice(8) + '/' + g.slice(5, 7);
     let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${esc(titolo)}">`;
     [0, .5, 1].forEach(f => {
@@ -406,16 +430,20 @@ export function renderStatistiche() {
       svg += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="1"/>` +
              `<text x="${L - 5}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--muted)">${_fmtDurMs(maxMs * f)}</text>`;
     });
-    const nEt = Math.min(pts.length, 5);                       // etichette giorni: al massimo 5
-    const idx = pts.length <= 5 ? pts.map((_, i) => i) : Array.from({ length: nEt }, (_, i) => Math.round(i * (pts.length - 1) / (nEt - 1)));
-    idx.forEach(i => { svg += `<text x="${X(pts[i].g)}" y="${H - 12}" text-anchor="middle" font-size="9" fill="var(--muted)">${dm(pts[i].g)}</text>`; });
-    if (pts.length > 1) svg += `<polyline fill="none" stroke="${colLinea}" stroke-width="2.5" stroke-linejoin="round" points="${pts.map(q => X(q.g) + ',' + Y(q.ms)).join(' ')}"/>`;
-    pts.forEach(q => { svg += `<circle cx="${X(q.g)}" cy="${Y(q.ms)}" r="3.5" fill="${colLinea}"><title>${_ggIt(q.g)} · ${_fmtDurMs(q.ms)} (${q.n} ${q.n === 1 ? 'missione' : 'missioni'})</title></circle>`; });
-    el.innerHTML = testa + svg + '</svg><div style="text-align:center;font-size:10px;color:var(--muted)">giorno di consegna · tempo medio Creata → Consegna</div>';
+    giorniW.forEach(g => { svg += `<text x="${X(g)}" y="${H - 12}" text-anchor="middle" font-size="9" fill="var(--muted)">${dm(g)}</text>`; });
+    serie.forEach(q => {
+      if (q.pts.length > 1) svg += `<polyline fill="none" stroke="${colLinea}" stroke-width="2.5" stroke-linejoin="round"${q.x.dash ? ` stroke-dasharray="${q.x.dash}"` : ''} points="${q.pts.map(p => X(p.g) + ',' + Y(p.ms)).join(' ')}"/>`;
+      q.pts.forEach(p => { svg += `<circle cx="${X(p.g)}" cy="${Y(p.ms)}" r="3.5" fill="${colLinea}"><title>${esc(q.x.l)} · ${_ggIt(p.g)} · ${_fmtDurMs(p.ms)} (${p.n} ${p.n === 1 ? 'missione' : 'missioni'})</title></circle>`; });
+    });
+    const legenda = passiAtt.length > 1
+      ? `<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;font-size:10px;color:var(--muted)">` +
+        passiAtt.map(x => `<span style="display:inline-flex;align-items:center;gap:4px"><svg width="26" height="6"><line x1="0" x2="26" y1="3" y2="3" stroke="${colLinea}" stroke-width="2.5"${x.dash ? ` stroke-dasharray="${x.dash}"` : ''}/></svg>${esc(x.l)}</span>`).join('') + '</div>'
+      : `<div style="text-align:center;font-size:10px;color:var(--muted)">giorno · tempo medio ${esc(passiAtt[0].l)}</div>`;
+    el.innerHTML = testa + svg + '</svg>' + legenda;
   };
-  lineaGrafico('stat-linea-all',   'Tutte',          'var(--text)', 'var(--violet)', G.tipo.length ? [] : T.M);
-  lineaGrafico('stat-linea-blu',   '🔵 Linea Blu',   '#2563eb',     '#2563eb',       (!G.tipo.length || G.tipo.includes('lineaBlu'))   ? T.M.filter(m => m.lineaBlu)   : []);
-  lineaGrafico('stat-linea-rossa', '🔴 Linea Rossa', '#dc2626',     '#dc2626',       (!G.tipo.length || G.tipo.includes('lineaRossa')) ? T.M.filter(m => m.lineaRossa) : []);
+  lineaGrafico('stat-linea-all',   'Tutte',          'var(--text)', 'var(--accent2)', G.tipo.length ? [] : T.M);
+  lineaGrafico('stat-linea-blu',   '🔵 Linea Blu',   '#2563eb',     '#2563eb',        (!G.tipo.length || G.tipo.includes('lineaBlu'))   ? T.M.filter(m => m.lineaBlu)   : []);
+  lineaGrafico('stat-linea-rossa', '🔴 Linea Rossa', '#dc2626',     '#dc2626',        (!G.tipo.length || G.tipo.includes('lineaRossa')) ? T.M.filter(m => m.lineaRossa) : []);
 
   // ── 2. Consegne per operatore (data di consegna; default: oggi) ──
   const dayEl = document.getElementById('stat-giorni');
@@ -470,7 +498,7 @@ window.renderStatistiche = renderStatistiche;
 // Azzera i filtri globali e quelli di tutte le sezioni
 window.resetFiltriStat = function () {
   ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp', 'ss-area', 'ss-tipo',
-   'sl-t-op', 'sl-t-da', 'sl-t-a', 'sl-g-da', 'sl-g-a', 'sl-g-op', 'sl-b-bp', 'sl-p-bp', 'sl-p-b'
+   'sl-t-op', 'sl-t-da', 'sl-t-a', 'sl-l-pass', 'sl-l-week', 'sl-g-da', 'sl-g-a', 'sl-g-op', 'sl-b-bp', 'sl-p-bp', 'sl-p-b'
   ].forEach(id => {
     const el = document.getElementById(id); if (!el) return;
     if (_ms.has(id)) _ms.set(id, new Set()); else el.value = '';
