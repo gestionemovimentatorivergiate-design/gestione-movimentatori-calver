@@ -276,6 +276,11 @@
         <input type="text" id="ub-desc" placeholder="Descrizione (facolt.)" style="flex:2;min-width:140px" onkeydown="if(event.key==='Enter')addUbicazione()">
         <button class="btnGreen btnSmall" onclick="addUbicazione()">+ Aggiungi</button>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 6px">
+        <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Filtra per building</span>
+        <select id="ub-filtro-b" onchange="renderUbicazioni()" style="min-width:200px"><option value="">Tutti i building</option></select>
+        <span id="ub-conta" style="font-size:12px;color:var(--muted)"></span>
+      </div>
       <div id="ub-list"></div>
     </div>
 
