@@ -129,13 +129,22 @@ window.cambiaAreaInCorso = function () {
   renderInCorso();
 };
 
+// Missione che l'utente ha già in carico (una alla volta): la prima trovata, altrimenti null
+function _miaInCarico() {
+  const u = _getUser();
+  return _getState().missioni.find(m => m.stato === 'in_transito' && m.navettaId === u.uid) || null;
+}
+
 function _card(item) {
   let statoBadge, actionBtn, meta;
   if (item._avail) {
     // Da prendere → pulsante GIALLO
     statoBadge = `<span class="mStatoBadge richiesta">Aperta</span>`;
     meta = `⏱ in coda da ${fmtDur(item.createdAt)}`;
-    actionBtn = `<button class="btnOrange" onclick="prendiMissione('${item.id}')">🚚 Prendi in carico</button>`;
+    const occupato = _miaInCarico();
+    actionBtn = occupato
+      ? `<button class="btnOrange" style="opacity:.45" onclick="prendiMissione('${item.id}')" title="Hai già una missione in carico">🔒 Prendi in carico</button>`
+      : `<button class="btnOrange" onclick="prendiMissione('${item.id}')">🚚 Prendi in carico</button>`;
   } else {
     // Preso in carico → pulsante VERDE
     statoBadge = `<span class="mStatoBadge in_transito">In carico</span>`;
@@ -195,6 +204,12 @@ async function _prendi(coll, id, statoAtteso) {
 
 window.prendiMissione = async function (id) {
   const m = _getState().missioni.find(x => x.id === id);
+  // Una sola missione in carico alla volta
+  const mia = _miaInCarico();
+  if (mia) {
+    showToast(`Hai già una missione in carico${mia.codice ? ' (' + mia.codice + ')' : ''}: confermane la consegna prima di prenderne un'altra.`, 'error');
+    return;
+  }
   try {
     await _prendi('missioni', id, 'richiesta');
     if (m) await window.logHistory({ action: 'Preso in carico', codice: m.codice || null, elemento: m.elementoCodice, origine: m.origineNome, destinazione: m.destinazioneNome });
