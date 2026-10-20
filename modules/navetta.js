@@ -49,18 +49,33 @@ export function renderInCorso() {
     sel.value = aree.some(a => a.id === cur) ? cur : '';
     area = aree.find(a => a.id === sel.value) || null;
   }
-  // Filtro "Origine": menu dei punti; se è scelta un'area, propone solo i punti di quell'area.
+  // Filtro "Reparto": solo le missioni con ORIGINE in uno dei punti del reparto (scelta memorizzata)
+  const reparti = (st.reparti || []).filter(r => r.attivo !== false)
+    .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+  const rSel = document.getElementById('ic-reparto');
+  let reparto = null;
+  if (rSel) {
+    let cur = rSel.value;
+    if (rSel.dataset.uid !== u.uid && reparti.length) {
+      rSel.dataset.uid = u.uid;
+      try { cur = localStorage.getItem('repartoInCorso:' + u.uid) || ''; } catch (e) { cur = ''; }
+    }
+    rSel.innerHTML = '<option value="">Tutti i reparti</option>' + reparti.map(r => `<option value="${esc(r.id)}">${esc(r.nome)}</option>`).join('');
+    rSel.value = reparti.some(r => r.id === cur) ? cur : '';
+    reparto = reparti.find(r => r.id === rSel.value) || null;
+  }
+  // Filtro "Origine": menu dei punti; limitato ai punti dell'area e/o del reparto scelti.
   const oSel = document.getElementById('ic-origine');
   let origId = '';
   if (oSel) {
-    const punti = (st.ubicazioni || []).filter(x => x.attivo !== false && (!area || (area.puntiIds || []).includes(x.id)))
+    const punti = (st.ubicazioni || []).filter(x => x.attivo !== false && (!area || (area.puntiIds || []).includes(x.id)) && (!reparto || (reparto.puntiIds || []).includes(x.id)))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
     const cur = oSel.value;
     oSel.innerHTML = '<option value="">Tutte le origini</option>' + punti.map(x => `<option value="${esc(x.id)}">${esc(x.nome)}</option>`).join('');
     oSel.value = punti.some(x => x.id === cur) ? cur : '';
     origId = oSel.value;
   }
-  const inArea = m => (!area || (area.puntiIds || []).includes(m.destinazioneId)) && (!origId || m.origineId === origId);
+  const inArea = m => (!area || (area.puntiIds || []).includes(m.destinazioneId)) && (!reparto || (reparto.puntiIds || []).includes(m.origineId)) && (!origId || m.origineId === origId);
 
   // Da prendere
   const avTutte = st.missioni.filter(m => m.stato === 'richiesta');
@@ -74,7 +89,7 @@ export function renderInCorso() {
 
   const nascoste = (avTutte.length - avMiss.length) + (tkTutte.length - tkMiss.length);
   const nEl = document.getElementById('ic-nascoste');
-  if (nEl) nEl.textContent = (area || origId) && nascoste ? `${nascoste} ${nascoste === 1 ? 'missione nascosta' : 'missioni nascoste'} dai filtri` : '';
+  if (nEl) nEl.textContent = (area || reparto || origId) && nascoste ? `${nascoste} ${nascoste === 1 ? 'missione nascosta' : 'missioni nascoste'} dai filtri` : '';
 
   // Un'unica lista: prima le missioni LINEA BLU, poi tutto il resto; a parità
   // ordinata per anzianità. Prendere un elemento non lo sposta di posizione
@@ -95,7 +110,7 @@ export function renderInCorso() {
       <div class="statCard green"><div class="val">${tkMiss.length}</div><div class="lbl">In carico</div></div>`;
   }
 
-  if (!lista.length) { el.innerHTML = (area || fStato || origId) ? '<div class="emptyState">Nessuna missione con questi filtri. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
+  if (!lista.length) { el.innerHTML = (area || reparto || fStato || origId) ? '<div class="emptyState">Nessuna missione con questi filtri. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
   el.innerHTML = lista.map(_card).join('');
 }
 
@@ -103,6 +118,11 @@ export function renderInCorso() {
 function _presa(m) { return m.presaInCaricoAt ? tsVal(m.presaInCaricoAt) : Date.now() + 1e9; }
 
 window.renderInCorso = renderInCorso;
+window.cambiaRepartoInCorso = function () {
+  const u = _getUser();
+  try { localStorage.setItem('repartoInCorso:' + u.uid, document.getElementById('ic-reparto')?.value || ''); } catch (e) {}
+  renderInCorso();
+};
 window.cambiaAreaInCorso = function () {
   const u = _getUser();
   try { localStorage.setItem('areaInCorso:' + u.uid, document.getElementById('ic-area')?.value || ''); } catch (e) {}
