@@ -154,6 +154,7 @@
         <select id="ic-stato" onchange="renderInCorso()"><option value="">Tutti</option><option value="aperta">Aperta</option><option value="carico">In carico</option></select></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Punto di origine</div>
         <select id="ic-origine" onchange="renderInCorso()" style="min-width:200px"><option value="">Tutte le origini</option></select></div>
+      <button class="btnGray btnSmall" onclick="resetFiltriInCorso()">✕ Resetta filtri</button>
     </div>
     <div class="pageSubtitle" id="ic-nascoste" style="margin-top:-2px"></div>
     <div class="statsRow" id="incorso-stats"></div>
