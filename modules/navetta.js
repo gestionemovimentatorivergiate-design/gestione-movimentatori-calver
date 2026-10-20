@@ -118,6 +118,12 @@ export function renderInCorso() {
 function _presa(m) { return m.presaInCaricoAt ? tsVal(m.presaInCaricoAt) : Date.now() + 1e9; }
 
 window.renderInCorso = renderInCorso;
+window.resetFiltriInCorso = function () {
+  const u = _getUser();
+  ['ic-area', 'ic-reparto', 'ic-stato', 'ic-origine'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  try { localStorage.setItem('areaInCorso:' + u.uid, ''); localStorage.setItem('repartoInCorso:' + u.uid, ''); } catch (e) {}
+  renderInCorso();
+};
 window.cambiaRepartoInCorso = function () {
   const u = _getUser();
   try { localStorage.setItem('repartoInCorso:' + u.uid, document.getElementById('ic-reparto')?.value || ''); } catch (e) {}
