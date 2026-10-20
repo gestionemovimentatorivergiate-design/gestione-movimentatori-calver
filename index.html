@@ -173,6 +173,7 @@
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">ID missione</div><input type="text" id="st-id" placeholder="es. 0001-13-102026" style="width:150px" oninput="renderStorico()" spellcheck="false"></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Elemento</div><select id="st-elemento" onchange="renderStorico()"><option value="">Tutti</option></select></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Stato</div><select id="st-azione" onchange="renderStorico()"><option value="">Tutte</option></select></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Tipo di conferma</div><select id="st-conferma" onchange="renderStorico()"><option value="">Tutti</option><option value="B">B · Barcode</option><option value="M">M · Manuale (PC)</option></select></div>
       <button class="btnGray btnSmall" onclick="resetFiltriStorico()">✕ Azzera filtri</button>
     </div>
     <div class="pageSubtitle" id="st-count" style="margin-top:-4px"></div>
