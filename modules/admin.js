@@ -171,6 +171,58 @@ const _gg = ms => ms ? new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Eur
 const _ggIt = s => s ? s.split('-').reverse().join('/') : '';
 const _val = id => document.getElementById(id)?.value || '';
 
+// ── Menu a selezione multipla (filtri Statistiche) ──
+const _ms = new Map();                       // id → Set dei valori scelti
+const _msVal = id => [...(_ms.get(id) || [])];
+document.addEventListener('click', e => {   // chiude i menu aperti cliccando fuori
+  document.querySelectorAll('.ms.open').forEach(r => { if (!r.contains(e.target)) r.classList.remove('open'); });
+});
+// groups: [{label?, items:[{v,l}]}] — ricostruisce le voci solo se cambiano (il pannello resta aperto)
+function _msFill(id, groups, tutti) {
+  const root = document.getElementById(id); if (!root) return [];
+  const valide = new Set(groups.flatMap(g => g.items.map(i => i.v)));
+  const sel = new Set([...(_ms.get(id) || [])].filter(v => valide.has(v)));
+  _ms.set(id, sel);
+  const sig = JSON.stringify(groups);
+  if (root.dataset.sig !== sig) {
+    root.dataset.sig = sig; root.classList.add('ms');
+    root.innerHTML = '<button type="button" class="msBtn"></button><div class="msPanel">' +
+      '<input class="msSearch" placeholder="Cerca…" autocomplete="off"><div class="msList">' +
+      groups.map(g => (g.label ? `<div class="msGrp">${esc(g.label)}</div>` : '') +
+        g.items.map(i => `<label class="msOpt"><input type="checkbox" value="${esc(i.v)}"><span>${esc(i.l)}</span></label>`).join('')).join('') +
+      '</div><div class="msFoot"><button type="button" class="msClear">Deseleziona tutto</button></div></div>';
+    if (!root._msBound) {
+      root._msBound = true;
+      root.addEventListener('click', e => {
+        if (e.target.closest('.msBtn')) {
+          const apri = !root.classList.contains('open');
+          document.querySelectorAll('.ms.open').forEach(r => r.classList.remove('open'));
+          if (apri) root.classList.add('open');
+        } else if (e.target.closest('.msClear')) {
+          _ms.set(id, new Set()); renderStatistiche();
+        }
+      });
+      root.addEventListener('change', e => {
+        const cb = e.target; if (cb.type !== 'checkbox') return;
+        const set = _ms.get(id) || new Set();
+        if (cb.checked) set.add(cb.value); else set.delete(cb.value);
+        _ms.set(id, set); renderStatistiche();
+      });
+      root.addEventListener('input', e => {
+        if (!e.target.classList.contains('msSearch')) return;
+        const q = e.target.value.trim().toLowerCase();
+        root.querySelectorAll('.msOpt').forEach(o => { o.style.display = !q || o.textContent.toLowerCase().includes(q) ? '' : 'none'; });
+      });
+    }
+  }
+  root.querySelectorAll('.msOpt input').forEach(cb => { cb.checked = sel.has(cb.value); });
+  const nomi = {}; groups.forEach(g => g.items.forEach(i => { nomi[i.v] = i.l; }));
+  const btn = root.querySelector('.msBtn');
+  btn.textContent = sel.size === 0 ? tutti : sel.size === 1 ? nomi[[...sel][0]] : sel.size + ' selezionati';
+  root.classList.toggle('sel', sel.size > 0);
+  return [...sel];
+}
+
 export function renderStatistiche() {
   const st = _getState();
   const cards = document.getElementById('stat-cards');
@@ -216,39 +268,44 @@ export function renderStatistiche() {
   const els = base.map(m => m.elementoCodice);
   const bSorted = st.buildings.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), 'it', { numeric: true }));
   const uSorted = st.ubicazioni.slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
-  const bOpts = bSorted.map(b => `<option value="b:${esc(b.id)}">${esc(bLabel(b.id))}</option>`).join('');
-  const uOpts = uSorted.map(u => `<option value="u:${esc(u.id)}">${esc(u.nome)}</option>`).join('');
-  const bpVals = st.buildings.map(b => 'b:' + b.id).concat(st.ubicazioni.map(u => 'u:' + u.id));
-  const bpHtml = '<option value="">Tutti</option><optgroup label="Building">' + bOpts + '</optgroup><optgroup label="Punti carico-scarico">' + uOpts + '</optgroup>';
+  const opG = vals => [{ items: [...new Set(vals.filter(Boolean))].sort((x, y) => String(x).localeCompare(String(y), 'it', { numeric: true })).map(v => ({ v, l: v })) }];
+  const bItems = bSorted.map(b => ({ v: 'b:' + b.id, l: bLabel(b.id) }));
+  const uItems = uSorted.map(u => ({ v: 'u:' + u.id, l: u.nome }));
+  const bpG = [{ label: 'Building', items: bItems }, { label: 'Punti carico-scarico', items: uItems }];
 
-  const fOp = fillSel('ss-op', opts(ops, 'Tutti'), ops);
+  const fOp = _msFill('ss-op', opG(ops), 'Tutti');
   fillSel('ss-elemento', opts(els, 'Tutti'), els);
-  const fBp = fillSel('ss-bp', bpHtml, bpVals);
+  const fBp = _msFill('ss-bp', bpG, 'Tutti');
   // Aree di movimentazione (per destinazione della missione)
   const aree = (st.aree || []).slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
   const fArea = fillSel('ss-area', '<option value="">Tutte</option>' + aree.map(a => `<option value="${esc(a.id)}">${esc(a.nome)}</option>`).join(''), aree.map(a => a.id));
   const areaSel = aree.find(a => a.id === fArea);
   const areaPunti = areaSel ? (areaSel.puntiIds || []) : null;
-  // filtri locali di sezione
-  const lTOp = fillSel('sl-t-op', opts(ops, 'Tutti'), ops);
-  const lTBp = fillSel('sl-t-bp', bpHtml, bpVals);
-  const lGOp = fillSel('sl-g-op', opts(ops, 'Tutti'), ops);
-  const lBBp = fillSel('sl-b-bp', '<option value="">Tutti i building</option>' + bOpts, bpVals);
-  const lPB = fillSel('sl-p-b', '<option value="">Tutti i building</option>' + bOpts.replace(/value="b:/g, 'value="'), st.buildings.map(b => b.id));
-  const lPBp = fillSel('sl-p-bp', '<option value="">Tutti i punti</option>' + uOpts, bpVals);
+  // filtri locali di sezione (selezione multipla)
+  const lTOp = _msFill('sl-t-op', opG(ops), 'Tutti');
+  const lTDa = _msFill('sl-t-da', bpG, 'Tutti');
+  const lTA  = _msFill('sl-t-a',  bpG, 'Tutti');
+  const lGOp = _msFill('sl-g-op', opG(ops), 'Tutti');
+  const lBBp = _msFill('sl-b-bp', [{ items: bItems }], 'Tutti i building');
+  const lPBp = _msFill('sl-p-bp', [{ items: uItems }], 'Tutti i punti');
+  const lPB  = _msFill('sl-p-b',  [{ items: bItems.map(i => ({ v: i.v.slice(2), l: i.l })) }], 'Tutti i building');
 
-  const G = { op: fOp, el: _val('ss-elemento'), tipo: _val('ss-tipo'), bp: fBp, area: areaPunti };
+  const G = { op: fOp, el: _val('ss-elemento'), tipo: _val('ss-tipo'), bp: fBp, da: [], a: [], area: areaPunti };
   const fDa = _val('ss-da'), fA = _val('ss-a');
 
   // Building e punti toccati da una missione (origine e/o destinazione)
   const punti = m => [...new Set([m.origineId, m.destinazioneId].filter(Boolean))];
   const bldgs = m => [...new Set([m.origineId, m.destinazioneId].map(i => ubMap[i]?.buildingId).filter(Boolean))];
+  // Un token è 'b:<idBuilding>' o 'u:<idPunto>'
+  const tokOk = (tok, ubId) => tok[0] === 'b' ? ubMap[ubId]?.buildingId === tok.slice(2) : ubId === tok.slice(2);
   const okBase = (m, f) =>
-    (!f.op || m.navettaNome === f.op) &&
+    (!f.op.length || f.op.includes(m.navettaNome)) &&
     (!f.el || m.elementoCodice === f.el) &&
     (!f.tipo || !!m[f.tipo]) &&
     (!f.area || f.area.includes(m.destinazioneId)) &&
-    (!f.bp || (f.bp[0] === 'b' ? bldgs(m).includes(f.bp.slice(2)) : punti(m).includes(f.bp.slice(2))));
+    (!f.bp.length || f.bp.some(t => t[0] === 'b' ? bldgs(m).includes(t.slice(2)) : punti(m).includes(t.slice(2)))) &&
+    (!f.da.length || f.da.some(t => tokOk(t, m.origineId))) &&
+    (!f.a.length || f.a.some(t => tokOk(t, m.destinazioneId)));
   const inRange = (ms, da, a) => {
     if (!da && !a) return true;
     const g = _gg(ms); if (!g) return false;
@@ -256,7 +313,7 @@ export function renderStatistiche() {
   };
   // missioni di una sezione: filtri globali, con eventuali sostituzioni locali
   const sezione = (loc = {}) => {
-    const f = { ...G, ...Object.fromEntries(Object.entries(loc).filter(([, v]) => v)) };
+    const f = { ...G, ...Object.fromEntries(Object.entries(loc).filter(([, v]) => Array.isArray(v) ? v.length : v)) };
     return { f, M: base.filter(m => okBase(m, f) && inRange(tsVal(m.createdAt), fDa, fA)) };
   };
 
@@ -278,9 +335,9 @@ export function renderStatistiche() {
     <div class="statCard violet"><div class="val">${_fmtDurMs(t3.ms)}</div><div class="lbl">Tempo medio totale</div></div>`;
 
   // Tabella a barre (nome | missioni con barretta e numero [| partenze | arrivi])
-  const tabella = (res, selKey, semplice, vuoto, colNome = 'Nome', conArea = false) => {
+  const tabella = (res, selKeys, semplice, vuoto, colNome = 'Nome', conArea = false) => {
     let rows = Object.entries(res);
-    if (selKey) rows = rows.filter(([k]) => k === selKey);
+    if (selKeys && selKeys.length) rows = rows.filter(([k]) => selKeys.includes(k));
     rows.sort((x, y) => y[1].tot - x[1].tot || x[1].nome.localeCompare(y[1].nome, 'it', { numeric: true }));
     if (!rows.length) return `<div style="color:var(--muted);font-size:13px;padding:10px 2px">${vuoto || 'Nessun dato'}</div>`;
     const max = rows[0][1].tot || 1;
@@ -293,9 +350,9 @@ export function renderStatistiche() {
   };
 
   // ── 1. Tempi medi: tre grafici, ognuno nella propria card ──
-  const T = sezione({ op: lTOp, bp: lTBp });
+  const T = sezione({ op: lTOp, da: lTDa, a: lTA });
   const sub = document.getElementById('stat-tempi-sub');
-  if (sub) sub.textContent = T.f.op ? 'Operatore: ' + T.f.op : 'Tutti gli operatori';
+  if (sub) sub.textContent = T.f.op.length ? 'Operatori: ' + T.f.op.join(', ') : 'Tutti gli operatori';
   const grafico = (elId, titolo, colTit, arr) => {
     const el = document.getElementById(elId); if (!el) return;
     const a1 = media(arr, 'createdAt', 'presaInCaricoAt'), a2 = media(arr, 'presaInCaricoAt', 'consegnataAt'), a3 = media(arr, 'createdAt', 'consegnataAt');
@@ -329,14 +386,14 @@ export function renderStatistiche() {
     const lDa = _val('sl-g-da'), lA = _val('sl-g-a');
     let dal = lDa || lA ? lDa : fDa, al = lDa || lA ? lA : fA;
     if (!dal && !al) { dal = oggi; al = oggi; }
-    const f = { ...G, op: lGOp || G.op };
+    const f = { ...G, op: lGOp.length ? lGOp : G.op };
     const C = base.filter(m => m.stato === 'consegnata' && m.consegnataAt && okBase(m, f) && inRange(tsVal(m.consegnataAt), dal, al));
     const res = {};
     C.forEach(m => { const o = m.navettaNome || '—'; (res[o] = res[o] || { nome: o, tot: 0 }).tot++; });
     const subG = document.getElementById('stat-giorni-sub');
     if (subG) subG.textContent = dal && dal === al ? (dal === oggi ? 'Oggi · ' : '') + _ggIt(dal)
       : 'Dal ' + (_ggIt(dal) || 'inizio') + ' al ' + (_ggIt(al) || 'oggi');
-    dayEl.innerHTML = tabella(res, '', true, 'Nessuna consegna nel periodo selezionato.')
+    dayEl.innerHTML = tabella(res, null, true, 'Nessuna consegna nel periodo selezionato.')
       + (C.length ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">Totale consegne: <b>${C.length}</b></div>` : '');
   }
 
@@ -355,7 +412,7 @@ export function renderStatistiche() {
     if (bd && bRes[bd]) bRes[bd].a++;
   });
   const bEl = document.getElementById('stat-building');
-  if (bEl) bEl.innerHTML = tabella(bRes, B.f.bp[0] === 'b' ? B.f.bp.slice(2) : '', false, '', 'Building', true);
+  if (bEl) bEl.innerHTML = tabella(bRes, lBBp.map(t => t.slice(2)), false, '', 'Building', true);
 
   // ── 4. Missioni per Punto carico-scarico ──
   const P = sezione({ bp: lPBp });
@@ -366,17 +423,20 @@ export function renderStatistiche() {
     if (m.destinazioneId && pRes[m.destinazioneId]) pRes[m.destinazioneId].a++;
   });
   // Filtro per Building di appartenenza: restano solo i punti di quel building
-  if (lPB) Object.keys(pRes).forEach(k => { if (ubMap[k]?.buildingId !== lPB) delete pRes[k]; });
+  if (lPB.length) Object.keys(pRes).forEach(k => { if (!lPB.includes(ubMap[k]?.buildingId)) delete pRes[k]; });
   const pEl = document.getElementById('stat-punti');
-  if (pEl) pEl.innerHTML = tabella(pRes, P.f.bp[0] === 'u' ? P.f.bp.slice(2) : '', false, '', 'Punto di carico-scarico', true);
+  if (pEl) pEl.innerHTML = tabella(pRes, lPBp.map(t => t.slice(2)), false, '', 'Punto di carico-scarico', true);
 }
 
 window.renderStatistiche = renderStatistiche;
 // Azzera i filtri globali e quelli di tutte le sezioni
 window.resetFiltriStat = function () {
   ['ss-da', 'ss-a', 'ss-op', 'ss-elemento', 'ss-bp', 'ss-area', 'ss-tipo',
-   'sl-t-op', 'sl-t-bp', 'sl-g-da', 'sl-g-a', 'sl-g-op', 'sl-b-bp', 'sl-p-bp', 'sl-p-b'
-  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+   'sl-t-op', 'sl-t-da', 'sl-t-a', 'sl-g-da', 'sl-g-a', 'sl-g-op', 'sl-b-bp', 'sl-p-bp', 'sl-p-b'
+  ].forEach(id => {
+    const el = document.getElementById(id); if (!el) return;
+    if (_ms.has(id)) _ms.set(id, new Set()); else el.value = '';
+  });
   renderStatistiche();
 };
 
