@@ -274,7 +274,8 @@ export function renderStatistiche() {
   const bpG = [{ label: 'Building', items: bItems }, { label: 'Punti carico-scarico', items: uItems }];
 
   const fOp = _msFill('ss-op', opG(ops), 'Tutti');
-  fillSel('ss-elemento', opts(els, 'Tutti'), els);
+  const fEl = _msFill('ss-elemento', opG(els), 'Tutti');
+  const fTipo = _msFill('ss-tipo', [{ items: [{ v: 'lineaBlu', l: 'Linea Blu' }, { v: 'lineaRossa', l: 'Linea Rossa' }, { v: 'vuoto', l: 'Vuoti' }] }], 'Tutte');
   const fBp = _msFill('ss-bp', bpG, 'Tutti');
   // Aree di movimentazione (per destinazione della missione)
   const aree = (st.aree || []).slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
@@ -290,7 +291,7 @@ export function renderStatistiche() {
   const lPBp = _msFill('sl-p-bp', [{ items: uItems }], 'Tutti i punti');
   const lPB  = _msFill('sl-p-b',  [{ items: bItems.map(i => ({ v: i.v.slice(2), l: i.l })) }], 'Tutti i building');
 
-  const G = { op: fOp, el: _val('ss-elemento'), tipo: _val('ss-tipo'), bp: fBp, da: [], a: [], area: areaPunti };
+  const G = { op: fOp, el: fEl, tipo: fTipo, bp: fBp, da: [], a: [], area: areaPunti };
   const fDa = _val('ss-da'), fA = _val('ss-a');
 
   // Building e punti toccati da una missione (origine e/o destinazione)
@@ -300,8 +301,8 @@ export function renderStatistiche() {
   const tokOk = (tok, ubId) => tok[0] === 'b' ? ubMap[ubId]?.buildingId === tok.slice(2) : ubId === tok.slice(2);
   const okBase = (m, f) =>
     (!f.op.length || f.op.includes(m.navettaNome)) &&
-    (!f.el || m.elementoCodice === f.el) &&
-    (!f.tipo || !!m[f.tipo]) &&
+    (!f.el.length || f.el.includes(m.elementoCodice)) &&
+    (!f.tipo.length || f.tipo.some(t => !!m[t])) &&
     (!f.area || f.area.includes(m.destinazioneId)) &&
     (!f.bp.length || f.bp.some(t => t[0] === 'b' ? bldgs(m).includes(t.slice(2)) : punti(m).includes(t.slice(2)))) &&
     (!f.da.length || f.da.some(t => tokOk(t, m.origineId))) &&
@@ -375,9 +376,9 @@ export function renderStatistiche() {
         <div style="font-size:10px;color:var(--muted)">su ${x.t.n} ${x.t.n === 1 ? 'missione' : 'missioni'}</div></div>`).join('') + `</div>`;
   };
   // Con un filtro "Tipo" attivo, restano valorizzati solo i grafici che gli corrispondono
-  grafico('stat-tempi-all',   'Tutte',          'var(--text)', G.tipo ? [] : T.M);
-  grafico('stat-tempi-blu',   '🔵 Linea Blu',   '#2563eb',     (!G.tipo || G.tipo === 'lineaBlu')   ? T.M.filter(m => m.lineaBlu)   : []);
-  grafico('stat-tempi-rossa', '🔴 Linea Rossa', '#dc2626',     (!G.tipo || G.tipo === 'lineaRossa') ? T.M.filter(m => m.lineaRossa) : []);
+  grafico('stat-tempi-all',   'Tutte',          'var(--text)', G.tipo.length ? [] : T.M);
+  grafico('stat-tempi-blu',   '🔵 Linea Blu',   '#2563eb',     (!G.tipo.length || G.tipo.includes('lineaBlu'))   ? T.M.filter(m => m.lineaBlu)   : []);
+  grafico('stat-tempi-rossa', '🔴 Linea Rossa', '#dc2626',     (!G.tipo.length || G.tipo.includes('lineaRossa')) ? T.M.filter(m => m.lineaRossa) : []);
 
   // ── 2. Consegne per operatore (data di consegna; default: oggi) ──
   const dayEl = document.getElementById('stat-giorni');
