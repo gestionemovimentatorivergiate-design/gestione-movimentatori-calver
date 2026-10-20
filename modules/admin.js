@@ -394,18 +394,11 @@ export function renderStatistiche() {
   const settimane = new Set();
   T.M.forEach(m => PASSI.forEach(x => { if (diff(m, x.da, x.a) != null) settimane.add(lunedi(_gg(tsVal(m[x.a])))); }));
   const wList = [...settimane].sort().reverse();
-  const wSel = document.getElementById('sl-l-week');
-  let weekIni = '';
-  if (wSel) {
-    const cur = wSel.value;
-    wSel.innerHTML = wList.length ? wList.map(w => `<option value="${w}">${_ggIt(w).slice(0, 5)} – ${_ggIt(aggiungiGg(w, 6))}</option>`).join('')
-                                  : '<option value="">Nessun dato</option>';
-    wSel.value = wList.includes(cur) ? cur : (wList[0] || '');
-    weekIni = wSel.value;
-  }
+  const wScelte = _msFill('sl-l-week', [{ items: wList.map(w => ({ v: w, l: _ggIt(w).slice(0, 5) + ' – ' + _ggIt(aggiungiGg(w, 6)) })) }], wList.length ? 'Ultima settimana' : 'Nessun dato');
+  const wAtt = (wScelte.length ? wScelte : wList.slice(0, 1)).slice().sort();   // senza scelta: la più recente
   const lineaGrafico = (elId, titolo, colTit, colLinea, arr) => {
     const el = document.getElementById(elId); if (!el) return;
-    const giorniW = weekIni ? Array.from({ length: 7 }, (_, i) => aggiungiGg(weekIni, i)) : [];
+    const giorniW = wAtt.flatMap(w => Array.from({ length: 7 }, (_, i) => aggiungiGg(w, i)));
     // serie: per ogni passaggio, media per giorno (giorno dell'evento finale) dentro la settimana
     const serie = passiAtt.map(x => {
       const pg = {};
@@ -418,9 +411,10 @@ export function renderStatistiche() {
     });
     const nMiss = new Set(arr.filter(m => passiAtt.some(x => { const d = diff(m, x.da, x.a); return d != null && giorniW.includes(_gg(tsVal(m[x.a]))); })).map(m => m.id)).size;
     const testa = `<div style="text-align:center;font-weight:800;font-size:13px;color:${colTit};margin-bottom:6px">${titolo} <span style="color:var(--muted);font-weight:600">(${nMiss})</span></div>`;
-    if (!serie.some(q => q.pts.length)) { el.innerHTML = testa + '<div style="height:150px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">Nessun dato in questa settimana</div>'; return; }
+    if (!serie.some(q => q.pts.length)) { el.innerHTML = testa + '<div style="height:150px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">Nessun dato nel periodo scelto</div>'; return; }
     const W = 320, H = 170, L = 56, R = 20, T0 = 12, B = 30;
-    const X = g => L + giorniW.indexOf(g) / 6 * (W - L - R);
+    const nG = giorniW.length;
+    const X = g => L + giorniW.indexOf(g) / Math.max(nG - 1, 1) * (W - L - R);
     const maxMs = Math.max(...serie.flatMap(q => q.pts.map(p => p.ms)), 1);
     const Y = ms => T0 + (1 - ms / maxMs) * (H - T0 - B);
     const dm = g => g.slice(8) + '/' + g.slice(5, 7);
@@ -430,10 +424,11 @@ export function renderStatistiche() {
       svg += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="1"/>` +
              `<text x="${L - 5}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--muted)">${_fmtDurMs(maxMs * f)}</text>`;
     });
-    giorniW.forEach(g => { svg += `<text x="${X(g)}" y="${H - 12}" text-anchor="middle" font-size="9" fill="var(--muted)">${dm(g)}</text>`; });
+    const passoEt = nG <= 7 ? 1 : 7 * Math.ceil(wAtt.length / 6);   // più settimane: etichette solo sui lunedì (a salti se troppe)
+    giorniW.forEach((g, i) => { if (i % passoEt === 0) svg += `<text x="${X(g)}" y="${H - 12}" text-anchor="middle" font-size="9" fill="var(--muted)">${dm(g)}</text>`; });
     serie.forEach(q => {
       if (q.pts.length > 1) svg += `<polyline fill="none" stroke="${colLinea}" stroke-width="2.5" stroke-linejoin="round"${q.x.dash ? ` stroke-dasharray="${q.x.dash}"` : ''} points="${q.pts.map(p => X(p.g) + ',' + Y(p.ms)).join(' ')}"/>`;
-      q.pts.forEach(p => { svg += `<circle cx="${X(p.g)}" cy="${Y(p.ms)}" r="3.5" fill="${colLinea}"><title>${esc(q.x.l)} · ${_ggIt(p.g)} · ${_fmtDurMs(p.ms)} (${p.n} ${p.n === 1 ? 'missione' : 'missioni'})</title></circle>`; });
+      q.pts.forEach(p => { svg += `<circle cx="${X(p.g)}" cy="${Y(p.ms)}" r="${nG > 14 ? 2.5 : 3.5}" fill="${colLinea}"><title>${esc(q.x.l)} · ${_ggIt(p.g)} · ${_fmtDurMs(p.ms)} (${p.n} ${p.n === 1 ? 'missione' : 'missioni'})</title></circle>`; });
     });
     const legenda = passiAtt.length > 1
       ? `<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;font-size:10px;color:var(--muted)">` +
