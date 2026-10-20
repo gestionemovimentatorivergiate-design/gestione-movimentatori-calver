@@ -225,3 +225,22 @@ tr:hover td { background: var(--surface2); }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ══ MENU A SELEZIONE MULTIPLA (Statistiche) ═════════════════════════════════ */
+.ms { position: relative; display: inline-block; min-width: 170px; max-width: 100%; }
+.msBtn { width: 100%; text-align: left; background: var(--card); border: 1.5px solid var(--border); border-radius: 9px; padding: 8px 30px 8px 12px; color: var(--text); font-family: inherit; font-size: 13px; cursor: pointer; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msBtn::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.ms.open .msBtn, .msBtn:focus { border-color: var(--accent); outline: none; }
+.ms.sel .msBtn { font-weight: 700; border-color: var(--accent2); }
+.msPanel { display: none; position: absolute; z-index: 50; left: 0; top: calc(100% + 4px); min-width: 100%; width: max-content; max-width: min(340px, 86vw); background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px rgba(28,31,38,.18); padding: 8px; }
+.ms.open .msPanel { display: block; }
+.msSearch { width: 100%; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 7px 10px; font-family: inherit; font-size: 13px; color: var(--text); outline: none; margin-bottom: 6px; }
+.msSearch:focus { border-color: var(--accent); }
+.msList { max-height: 240px; overflow-y: auto; }
+.msGrp { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; padding: 8px 6px 3px; }
+.msOpt { display: flex; align-items: center; gap: 8px; padding: 7px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.msOpt:hover { background: var(--surface2); }
+.msOpt input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent2); flex: none; }
+.msFoot { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 6px; text-align: right; }
+.msClear { background: none; border: 0; color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 6px; }
+.msClear:hover { color: var(--text); }

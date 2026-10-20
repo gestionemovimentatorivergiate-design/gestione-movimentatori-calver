@@ -194,9 +194,9 @@
     <div class="filterBar" style="align-items:flex-end">
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Dal</div><input type="date" id="ss-da" onchange="renderStatistiche()"></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Al</div><input type="date" id="ss-a" onchange="renderStatistiche()"></div>
-      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Operatore</div><select id="ss-op" onchange="renderStatistiche()"><option value="">Tutti</option></select></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Operatore</div><div id="ss-op"></div></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Elemento</div><select id="ss-elemento" onchange="renderStatistiche()"><option value="">Tutti</option></select></div>
-      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Building / Punto</div><select id="ss-bp" onchange="renderStatistiche()"><option value="">Tutti</option></select></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Building / Punto</div><div id="ss-bp"></div></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Area di movimentazione</div><select id="ss-area" onchange="renderStatistiche()"><option value="">Tutte</option></select></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Tipo</div><select id="ss-tipo" onchange="renderStatistiche()"><option value="">Tutte</option><option value="lineaBlu">Solo Linea Blu</option><option value="lineaRossa">Solo Linea Rossa</option><option value="vuoto">Solo Vuoti</option></select></div>
       <button class="btnGray btnSmall" onclick="resetFiltriStat()">✕ Azzera filtri</button>
@@ -206,7 +206,7 @@
     <div class="card">
       <div class="cardTitle">Tempo medio di passaggio tra stati</div>
       <div class="pageSubtitle" id="stat-tempi-sub" style="margin-top:-4px"></div>
-      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Operatore (sezione)</div><select id="sl-t-op" onchange="renderStatistiche()"><option value="">Tutti</option></select></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Building / Punto (sezione)</div><select id="sl-t-bp" onchange="renderStatistiche()"><option value="">Tutti</option></select></div></div>
+      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Operatore</div><div id="sl-t-op"></div></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Da Building/Punto</div><div id="sl-t-da"></div></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">A Building/Punto</div><div id="sl-t-a"></div></div></div>
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
       <div class="card" id="stat-tempi-all" style="flex:1;min-width:210px;margin:0"></div>
@@ -217,17 +217,17 @@
     <div class="card">
       <div class="cardTitle">Consegne completate per operatore</div>
       <div class="pageSubtitle" id="stat-giorni-sub" style="margin-top:-4px"></div>
-      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Dal (sezione)</div><input type="date" id="sl-g-da" onchange="renderStatistiche()"></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Al (sezione)</div><input type="date" id="sl-g-a" onchange="renderStatistiche()"></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Operatore (sezione)</div><select id="sl-g-op" onchange="renderStatistiche()"><option value="">Tutti</option></select></div></div>
+      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Dal</div><input type="date" id="sl-g-da" onchange="renderStatistiche()"></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Al</div><input type="date" id="sl-g-a" onchange="renderStatistiche()"></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Operatore</div><div id="sl-g-op"></div></div></div>
       <div id="stat-giorni"></div>
     </div>
     <div class="card">
       <div class="cardTitle">Missioni per Building</div>
-      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Building (sezione)</div><select id="sl-b-bp" onchange="renderStatistiche()"><option value="">Tutti i building</option></select></div></div>
+      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Building</div><div id="sl-b-bp"></div></div></div>
       <div id="stat-building"></div>
     </div>
     <div class="card">
       <div class="cardTitle">Missioni per punto carico-scarico</div>
-      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Punto (sezione)</div><select id="sl-p-bp" onchange="renderStatistiche()"><option value="">Tutti i punti</option></select></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Building (sezione)</div><select id="sl-p-b" onchange="renderStatistiche()"><option value="">Tutti i building</option></select></div></div>
+      <div class="filterBar" style="align-items:flex-end;margin-bottom:10px;padding:0;background:none;border:0"><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Punto</div><div id="sl-p-bp"></div></div><div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Building</div><div id="sl-p-b"></div></div></div>
       <div id="stat-punti"></div>
     </div>
   </div>
