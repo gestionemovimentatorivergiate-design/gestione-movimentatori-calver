@@ -278,10 +278,25 @@ export function renderUbicazioni() {
   _fillBuildingSelect();
   const el = document.getElementById('ub-list');
   if (!el) return;
-  const list = _getState().ubicazioni;
-  if (!list.length) { el.innerHTML = '<div class="emptyState">Nessun punto carico-scarico. Aggiungine uno sopra.</div>'; return; }
+  const tutti = _getState().ubicazioni;
+  if (!tutti.length) { el.innerHTML = '<div class="emptyState">Nessun punto carico-scarico. Aggiungine uno sopra.</div>'; return; }
   const bMap = {};
   _getState().buildings.forEach(b => { bMap[b.id] = b; });
+  // Filtro per building (mantiene la scelta): "__nessuno" = punti senza building
+  const fSel = document.getElementById('ub-filtro-b');
+  let fB = '';
+  if (fSel) {
+    const cur = fSel.value;
+    const bs = _getState().buildings.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), 'it', { numeric: true }));
+    fSel.innerHTML = '<option value="">Tutti i building</option><option value="__nessuno">— senza building</option>' +
+      bs.map(b => `<option value="${esc(b.id)}">${esc(b.id)} · ${esc(b.nome)}</option>`).join('');
+    fSel.value = (cur === '__nessuno' || bs.some(b => b.id === cur)) ? cur : '';
+    fB = fSel.value;
+  }
+  const list = !fB ? tutti : tutti.filter(u => fB === '__nessuno' ? !u.buildingId : u.buildingId === fB);
+  const cnt = document.getElementById('ub-conta');
+  if (cnt) cnt.textContent = fB ? `${list.length} di ${tutti.length} punti` : `${tutti.length} punti`;
+  if (!list.length) { el.innerHTML = '<div class="emptyState">Nessun punto carico-scarico per questo building.</div>'; return; }
   el.innerHTML = list.map(u => {
     const b = u.buildingId ? bMap[u.buildingId] : null;
     const bTxt = !u.buildingId ? '— nessun building'
@@ -300,6 +315,8 @@ export function renderUbicazioni() {
     </div>`;
   }).join('');
 }
+
+window.renderUbicazioni = renderUbicazioni;
 
 window.addUbicazione = async function () {
   if (!_requireAdmin()) return;
