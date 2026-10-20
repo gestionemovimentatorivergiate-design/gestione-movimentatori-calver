@@ -38,6 +38,20 @@ window.cambiaRepartoPren = function () {
   renderNuovaMissione();
 };
 
+// La destinazione non può coincidere con l'origine: la rimuove dall'elenco.
+function _filtraDestinazione() {
+  const st = _getState();
+  const orSel = document.getElementById('nm-origine');
+  const deSel = document.getElementById('nm-destinazione');
+  if (!orSel || !deSel) return;
+  const orId = orSel.value, cur = deSel.value;
+  const ubi = st.ubicazioni.filter(u => u.attivo !== false)
+    .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
+  deSel.innerHTML = '<option value="">— seleziona —</option>' +
+    ubi.filter(u => u.id !== orId).map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
+  deSel.value = (cur && cur !== orId) ? cur : '';
+}
+
 export function renderNuovaMissione() {
   const st = _getState();
   const elSel = document.getElementById('nm-elemento');
@@ -77,7 +91,7 @@ export function renderNuovaMissione() {
   orSel.innerHTML = '<option value="">— seleziona —</option>' +
     origini.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
   deSel.innerHTML = '<option value="">— seleziona —</option>' +
-    ubicazioni.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
+    ubicazioni.filter(u => !vOr || u.id !== vOr).map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
 
   // Ripristina selezione precedente se ancora valida
   elSel.value = vEl; orSel.value = vOr; deSel.value = vDe;
@@ -130,7 +144,7 @@ export function renderNuovaMissione() {
       anchor.parentNode.insertBefore(wrap, anchor.id === 'nm-btn' ? anchor : anchor.nextSibling);
     }
   }
-  orSel.onchange = _aggiornaSpunte;
+  orSel.onchange = () => { _filtraDestinazione(); _aggiornaSpunte(); };
   const cbBlu = document.getElementById('nm-lineablu'); if (cbBlu) cbBlu.onchange = _aggiornaSpunte;
   const cbRossa = document.getElementById('nm-linearossa'); if (cbRossa) cbRossa.onchange = _aggiornaSpunte;
   const cbVuoto = document.getElementById('nm-vuoto');  if (cbVuoto) cbVuoto.onchange = _aggiornaSpunte;
@@ -232,6 +246,7 @@ window.creaMissione = async function () {
   const origine = st.ubicazioni.find(x => x.id === orId);
   const destinazione = st.ubicazioni.find(x => x.id === deId);
   if (!elemento || !origine || !destinazione) { showToast('Dati non validi, riprova.', 'error'); return; }
+  if (orId === deId) { showToast('Origine e destinazione non possono coincidere.', 'error'); return; }
 
   // Linea Blu valida solo se l'origine appartiene al building B26
   const vuoto = !!document.getElementById('nm-vuoto')?.checked;
@@ -358,7 +373,7 @@ window.modificaMissione = function (id) {
   const ov = document.createElement('div');
   ov.className = 'modalOverlay open';
   ov.id = 'modalModificaMissione';
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  { let dn = false; ov.addEventListener('mousedown', e => { dn = e.target === ov; }); ov.onclick = e => { if (e.target === ov && dn) ov.remove(); }; }
   ov.innerHTML = `<div class="modalBox">
     <h3>Modifica missione${m.codice ? ' ' + esc(m.codice) : ''}</h3>
     <div class="field"><label>Elemento da spostare</label><select id="mm-elemento">${opt(elementi, 'codice', m.elementoId)}</select></div>
@@ -466,7 +481,7 @@ function _dialogConferma({ titolo, corpo, okLabel, backLabel, danger }) {
     const chiudi = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
     const onKey = e => { if (e.key === 'Escape') chiudi(false); };
     document.addEventListener('keydown', onKey);
-    ov.onclick = e => { if (e.target === ov) chiudi(false); };
+    { let dn = false; ov.addEventListener('mousedown', e => { dn = e.target === ov; }); ov.onclick = e => { if (e.target === ov && dn) chiudi(false); }; }
     document.getElementById('mc-back').onclick = () => chiudi(false);
     document.getElementById('mc-ok').onclick = () => chiudi(true);
     document.getElementById('mc-back').focus();

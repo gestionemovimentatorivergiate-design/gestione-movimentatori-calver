@@ -626,7 +626,7 @@ function _dialogDistruttiva({ titolo, avviso, parola, okLabel }) {
     const chiudi = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
     const onKey = e => { if (e.key === 'Escape') chiudi(false); };
     document.addEventListener('keydown', onKey);
-    ov.onclick = e => { if (e.target === ov) chiudi(false); };
+    { let dn = false; ov.addEventListener('mousedown', e => { dn = e.target === ov; }); ov.onclick = e => { if (e.target === ov && dn) chiudi(false); }; }
     const inp = document.getElementById('es-conf'), ok = document.getElementById('es-ok');
     const valido = () => inp.value.trim() === parola;
     inp.addEventListener('input', () => { ok.disabled = !valido(); ok.style.opacity = valido() ? '1' : '.45'; });

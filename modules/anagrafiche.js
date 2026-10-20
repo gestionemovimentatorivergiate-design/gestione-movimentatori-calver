@@ -48,7 +48,7 @@ function _dialogModifica({ titolo, campi, onSave }) {
   const ov = document.createElement('div');
   ov.className = 'modalOverlay open';
   ov.id = 'modalModificaAnagrafica';
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  { let dn = false; ov.addEventListener('mousedown', e => { dn = e.target === ov; }); ov.onclick = e => { if (e.target === ov && dn) ov.remove(); }; }
   ov.innerHTML = `<div class="modalBox"><h3>${esc(titolo)}</h3>${campi.map(riga).join('')}
     <div class="modalActions">
       <button class="btnGray" id="ma-chiudi">Chiudi</button>

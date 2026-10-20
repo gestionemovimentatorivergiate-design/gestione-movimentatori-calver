@@ -299,7 +299,7 @@ window.confermaMissione = function (id) {
   ov.className = 'modalOverlay open';
   ov.id = 'modalConfermaConsegna';
   const chiudi = () => { _fermaScanner(); ov.remove(); };
-  ov.onclick = e => { if (e.target === ov) chiudi(); };
+  { let dn = false; ov.addEventListener('mousedown', e => { dn = e.target === ov; }); ov.onclick = e => { if (e.target === ov && dn) chiudi(); }; }
   ov.innerHTML = `<div class="modalBox">
     <h3>Conferma consegna${m.codice ? ' ' + esc(m.codice) : ''}</h3>
     <div style="font-size:13px;color:var(--muted);margin-bottom:4px">Punto di destinazione</div>
