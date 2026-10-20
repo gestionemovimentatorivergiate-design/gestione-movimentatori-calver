@@ -40,6 +40,8 @@ export function renderStorico() {
     if (list.includes(cur)) sel.value = cur;
     return sel.value;
   };
+  // Tipo di conferma della consegna: B = barcode, M = manuale (da PC); solo per "Consegna completata"
+  const confTipo = h => /barcode/i.test(h.dettaglio || '') ? 'B' : /manualmente/i.test(h.dettaglio || '') ? 'M' : '';
   const stato = h => h.action === 'Pieno preso in carico' ? 'Preso in carico' : (h.action || '');   // vecchie voci rinominate
   const fAz  = fill('st-azione',   H.map(stato),         'Tutti');
   const fUt  = fill('st-utente',   H.map(utente),        'Tutti');
@@ -47,13 +49,14 @@ export function renderStorico() {
   const fEl  = fill('st-elemento', H.map(h => h.elemento), 'Tutti');
   const fPar = fill('st-partenza', H.map(h => h.origine),      'Tutti');
   const fArr = fill('st-arrivo',   H.map(h => h.destinazione), 'Tutti');
+  const fConf = document.getElementById('st-conferma')?.value || '';
   const fData = document.getElementById('st-data')?.value || '';          // aaaa-mm-gg
   const fId = (document.getElementById('st-id')?.value || '').trim().toLowerCase();
   const giorno = h => h.ts ? h.ts.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }) : '';
 
   // Nessun filtro attivo → si mostrano solo i movimenti dell'ultima settimana.
   // Con almeno un filtro attivo la ricerca copre tutte le voci caricate.
-  const nessunFiltro = !fAz && !fUt && !fPer && !fPar && !fArr && !fEl && !fData && !fId;
+  const nessunFiltro = !fAz && !fUt && !fPer && !fPar && !fArr && !fEl && !fConf && !fData && !fId;
   const da = Date.now() - 7 * 24 * 3600 * 1000;
 
   // Una missione compare se almeno una sua voce rispetta TUTTI i filtri (AND);
@@ -74,6 +77,7 @@ export function renderStorico() {
     (!fPer || percorso(h) === fPer) &&
     (!fPar || h.origine === fPar) &&
     (!fArr || h.destinazione === fArr) &&
+    (!fConf || confTipo(h) === fConf) &&
     (!fEl  || h.elemento === fEl) &&
     (!fData || giorno(h) === fData) &&
     (!fId  || (h.codice || '').toLowerCase().includes(fId))).map(chiave));
@@ -798,13 +802,14 @@ window.scaricaStoricoExcel = function () {
   const rows = _storicoRows;
   if (!rows.length) { showToast('Nessun movimento da scaricare.', 'error'); return; }
   try {
-    const head = ['Data', 'Ora', 'Stato', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Linea Rossa', 'Vuoto'];
+    const head = ['Data', 'Ora', 'Stato', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Linea Rossa', 'Vuoto', 'Tipo di conferma'];
     const dati = rows.map(h => [
       ..._excelData(h.ts), (h.action === 'Pieno preso in carico' ? 'Preso in carico' : (h.action || '')), h.codice || '', h.elemento || '',
       h.origine || '', h.destinazione || '', h.userName || h.user || '',
       h.lineaBlu ? 'Sì' : '', h.lineaRossa ? 'Sì' : '', h.vuoto ? 'Sì' : '',
+      /barcode/i.test(h.dettaglio || '') ? 'B' : /manualmente/i.test(h.dettaglio || '') ? 'M' : '',
     ]);
-    const bytes = _xlsxBytes(head, dati, [12, 10, 22, 17, 15, 20, 20, 22, 11, 12, 9]);
+    const bytes = _xlsxBytes(head, dati, [12, 10, 22, 17, 15, 20, 20, 22, 11, 12, 9, 17]);
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
     const a = document.createElement('a');
@@ -819,7 +824,7 @@ window.scaricaStoricoExcel = function () {
 };
 
 window.resetFiltriStorico = function () {
-  ['st-data', 'st-id', 'st-utente', 'st-percorso', 'st-partenza', 'st-arrivo', 'st-elemento', 'st-azione'].forEach(id => {
+  ['st-data', 'st-id', 'st-utente', 'st-percorso', 'st-partenza', 'st-arrivo', 'st-elemento', 'st-azione', 'st-conferma'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   renderStorico();
