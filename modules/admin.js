@@ -380,6 +380,43 @@ export function renderStatistiche() {
   grafico('stat-tempi-blu',   '🔵 Linea Blu',   '#2563eb',     (!G.tipo.length || G.tipo.includes('lineaBlu'))   ? T.M.filter(m => m.lineaBlu)   : []);
   grafico('stat-tempi-rossa', '🔴 Linea Rossa', '#dc2626',     (!G.tipo.length || G.tipo.includes('lineaRossa')) ? T.M.filter(m => m.lineaRossa) : []);
 
+  // Grafici a linea: tempo medio di completamento (Creata → Consegna) per giorno di consegna
+  const lineaGrafico = (elId, titolo, colTit, colLinea, arr) => {
+    const el = document.getElementById(elId); if (!el) return;
+    const perGiorno = {};
+    arr.forEach(m => {
+      const d = diff(m, 'createdAt', 'consegnataAt'); if (d == null) return;
+      const g = _gg(tsVal(m.consegnataAt)); if (!g) return;
+      (perGiorno[g] = perGiorno[g] || []).push(d);
+    });
+    const giorni = Object.keys(perGiorno).sort();
+    const testa = `<div style="text-align:center;font-weight:800;font-size:13px;color:${colTit};margin-bottom:6px">${titolo} <span style="color:var(--muted);font-weight:600">(${giorni.reduce((n, g) => n + perGiorno[g].length, 0)})</span></div>`;
+    if (!giorni.length) { el.innerHTML = testa + '<div style="height:150px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">Nessun dato</div>'; return; }
+    const pts = giorni.map(g => ({ g, ms: perGiorno[g].reduce((x, y) => x + y, 0) / perGiorno[g].length, n: perGiorno[g].length }));
+    const W = 320, H = 170, L = 56, R = 20, T = 12, B = 30;
+    const t0 = Date.parse(giorni[0] + 'T12:00:00Z'), t1 = Date.parse(giorni[giorni.length - 1] + 'T12:00:00Z');
+    const span = Math.max(t1 - t0, 1);
+    const X = g => pts.length === 1 ? (L + W - R) / 2 : L + (Date.parse(g + 'T12:00:00Z') - t0) / span * (W - L - R);
+    const maxMs = Math.max(...pts.map(q => q.ms), 1);
+    const Y = ms => T + (1 - ms / maxMs) * (H - T - B);
+    const dm = g => g.slice(8) + '/' + g.slice(5, 7);
+    let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${esc(titolo)}">`;
+    [0, .5, 1].forEach(f => {
+      const y = Y(maxMs * f);
+      svg += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="1"/>` +
+             `<text x="${L - 5}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--muted)">${_fmtDurMs(maxMs * f)}</text>`;
+    });
+    const nEt = Math.min(pts.length, 5);                       // etichette giorni: al massimo 5
+    const idx = pts.length <= 5 ? pts.map((_, i) => i) : Array.from({ length: nEt }, (_, i) => Math.round(i * (pts.length - 1) / (nEt - 1)));
+    idx.forEach(i => { svg += `<text x="${X(pts[i].g)}" y="${H - 12}" text-anchor="middle" font-size="9" fill="var(--muted)">${dm(pts[i].g)}</text>`; });
+    if (pts.length > 1) svg += `<polyline fill="none" stroke="${colLinea}" stroke-width="2.5" stroke-linejoin="round" points="${pts.map(q => X(q.g) + ',' + Y(q.ms)).join(' ')}"/>`;
+    pts.forEach(q => { svg += `<circle cx="${X(q.g)}" cy="${Y(q.ms)}" r="3.5" fill="${colLinea}"><title>${_ggIt(q.g)} · ${_fmtDurMs(q.ms)} (${q.n} ${q.n === 1 ? 'missione' : 'missioni'})</title></circle>`; });
+    el.innerHTML = testa + svg + '</svg><div style="text-align:center;font-size:10px;color:var(--muted)">giorno di consegna · tempo medio Creata → Consegna</div>';
+  };
+  lineaGrafico('stat-linea-all',   'Tutte',          'var(--text)', 'var(--violet)', G.tipo.length ? [] : T.M);
+  lineaGrafico('stat-linea-blu',   '🔵 Linea Blu',   '#2563eb',     '#2563eb',       (!G.tipo.length || G.tipo.includes('lineaBlu'))   ? T.M.filter(m => m.lineaBlu)   : []);
+  lineaGrafico('stat-linea-rossa', '🔴 Linea Rossa', '#dc2626',     '#dc2626',       (!G.tipo.length || G.tipo.includes('lineaRossa')) ? T.M.filter(m => m.lineaRossa) : []);
+
   // ── 2. Consegne per operatore (data di consegna; default: oggi) ──
   const dayEl = document.getElementById('stat-giorni');
   if (dayEl) {
