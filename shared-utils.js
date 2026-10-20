@@ -71,3 +71,29 @@ export function esc(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+// ── Finestra di conferma eliminazione (stesso stile delle finestre "Modifica") ──
+// Restituisce una Promise<boolean>. `nome` e `nota` sono testo semplice.
+export function dialogElimina({ titolo, nome, nota, okLabel = '🗑 Elimina' }) {
+  return new Promise(resolve => {
+    document.getElementById('modalElimina')?.remove();
+    const ov = document.createElement('div');
+    ov.className = 'modalOverlay open';
+    ov.id = 'modalElimina';
+    ov.innerHTML = `<div class="modalBox"><h3>${esc(titolo)}</h3>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;word-break:break-word">${esc(nome)}</div>
+      ${nota ? `<div style="font-size:13px;color:var(--muted);margin-bottom:6px">${esc(nota)}</div>` : ''}
+      <div class="modalActions">
+        <button class="btnGray" id="del-back">Annulla</button>
+        <button class="btnRed" id="del-ok">${esc(okLabel)}</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const onKey = e => { if (e.key === 'Escape') chiudi(false); };
+    const chiudi = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    document.addEventListener('keydown', onKey);
+    { let dn = false; ov.addEventListener('mousedown', e => { dn = e.target === ov; }); ov.onclick = e => { if (e.target === ov && dn) chiudi(false); }; }
+    document.getElementById('del-back').onclick = () => chiudi(false);
+    document.getElementById('del-ok').onclick = () => chiudi(true);
+    document.getElementById('del-back').focus();
+  });
+}
