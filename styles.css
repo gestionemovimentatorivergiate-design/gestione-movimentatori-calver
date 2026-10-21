@@ -244,3 +244,12 @@ tr:hover td { background: var(--surface2); }
 .msFoot { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 6px; text-align: right; }
 .msClear { background: none; border: 0; color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 6px; }
 .msClear:hover { color: var(--text); }
+
+/* Menu con ricerca a selezione singola (Prenotazioni) */
+.msOpt.on { background: var(--surface2); font-weight: 700; }
+.msOpt.on::before { content: '✓'; color: var(--accent2); font-weight: 800; }
+.field .ms.combo { display: block; width: 100%; }
+.field .ms.combo .msBtn { background: var(--bg); border-radius: 10px; padding: 12px 36px 12px 14px; font-size: 15px; min-height: 46px; }
+.field .ms.combo .msPanel { width: 100%; max-width: none; }
+.field .ms.combo .msOpt { padding: 10px 8px; font-size: 15px; }
+.field .ms.combo.sel .msBtn { font-weight: 600; }
