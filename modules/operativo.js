@@ -38,6 +38,69 @@ window.cambiaRepartoPren = function () {
   renderNuovaMissione();
 };
 
+// ── Menu a tendina con ricerca (selezione singola) ──────────────────────────
+// Affianca a un <select> un menu con barra di ricerca; il <select> resta nascosto
+// e mantiene valore ed eventi, quindi il resto del codice non cambia.
+let _comboChiusura = false;
+function _comboSync(id) {
+  const sel = document.getElementById(id); if (!sel) return;
+  if (!_comboChiusura) {
+    _comboChiusura = true;
+    document.addEventListener('click', e => {
+      document.querySelectorAll('.ms.combo.open').forEach(r => { if (!r.contains(e.target)) r.classList.remove('open'); });
+    });
+  }
+  let w = sel.nextElementSibling;
+  if (!w || !w.classList.contains('combo') || w.dataset.for !== id) {
+    w = document.createElement('div');
+    w.className = 'ms combo'; w.dataset.for = id;
+    w.innerHTML = '<button type="button" class="msBtn"></button><div class="msPanel">' +
+      '<input class="msSearch" placeholder="Cerca…" autocomplete="off" spellcheck="false"><div class="msList"></div></div>';
+    sel.style.display = 'none';
+    sel.after(w);
+    const filtra = () => {
+      const q = w.querySelector('.msSearch').value.trim().toLowerCase();
+      w.querySelectorAll('.msOpt').forEach(o => { o.style.display = !q || (o.dataset.v && o.textContent.toLowerCase().includes(q)) ? '' : 'none'; });
+    };
+    const scegli = v => {
+      sel.value = v;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      w.classList.remove('open');
+      _comboSync(id);
+    };
+    w.addEventListener('click', e => {
+      if (e.target.closest('.msBtn')) {
+        const apri = !w.classList.contains('open');
+        document.querySelectorAll('.ms.combo.open').forEach(r => r.classList.remove('open'));
+        if (apri) { w.classList.add('open'); const i = w.querySelector('.msSearch'); i.value = ''; filtra(); i.focus();
+          w.querySelector('.msOpt.on')?.scrollIntoView({ block: 'nearest' }); }
+        return;
+      }
+      const o = e.target.closest('.msOpt'); if (o) scegli(o.dataset.v);
+    });
+    w.addEventListener('input', e => { if (e.target.classList.contains('msSearch')) filtra(); });
+    w.addEventListener('keydown', e => {
+      if (e.key === 'Escape') w.classList.remove('open');
+      if (e.key === 'Enter' && e.target.classList.contains('msSearch')) {
+        e.preventDefault();
+        const primo = [...w.querySelectorAll('.msOpt')].find(o => o.style.display !== 'none' && o.dataset.v);
+        if (primo) scegli(primo.dataset.v);
+      }
+    });
+    w._filtra = filtra;
+  }
+  const opts = [...sel.options];
+  const sig = JSON.stringify(opts.map(o => [o.value, o.textContent])) + '|' + sel.value;
+  if (w.dataset.sig === sig) return;
+  w.dataset.sig = sig;
+  w.querySelector('.msList').innerHTML = opts.map(o =>
+    `<div class="msOpt${o.value === sel.value ? ' on' : ''}" data-v="${esc(o.value)}"><span>${esc(o.textContent)}</span></div>`).join('');
+  w.querySelector('.msBtn').textContent = sel.options[sel.selectedIndex]?.textContent || '— seleziona —';
+  w.classList.toggle('sel', !!sel.value);
+  w._filtra();
+}
+const _comboTutti = () => ['nm-reparto', 'nm-elemento', 'nm-origine', 'nm-destinazione'].forEach(_comboSync);
+
 // La destinazione non può coincidere con l'origine: la rimuove dall'elenco.
 function _filtraDestinazione() {
   const st = _getState();
@@ -50,6 +113,7 @@ function _filtraDestinazione() {
   deSel.innerHTML = '<option value="">— seleziona —</option>' +
     ubi.filter(u => u.id !== orId).map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
   deSel.value = (cur && cur !== orId) ? cur : '';
+  _comboSync('nm-destinazione');
 }
 
 export function renderNuovaMissione() {
@@ -149,6 +213,7 @@ export function renderNuovaMissione() {
   const cbRossa = document.getElementById('nm-linearossa'); if (cbRossa) cbRossa.onchange = _aggiornaSpunte;
   const cbVuoto = document.getElementById('nm-vuoto');  if (cbVuoto) cbVuoto.onchange = _aggiornaSpunte;
   _aggiornaSpunte();
+  _comboTutti();
 }
 
 // Linea Blu: la spunta è attiva solo se l'origine appartiene a questo Building
@@ -292,6 +357,7 @@ window.creaMissione = async function () {
     document.getElementById('nm-elemento').value = '';
     document.getElementById('nm-origine').value = '';
     document.getElementById('nm-destinazione').value = '';
+    _filtraDestinazione(); _comboTutti();
     const cn = document.getElementById('nm-note'); if (cn) cn.value = '';
     const cb = document.getElementById('nm-lineablu'); if (cb) cb.checked = false;
     const cr = document.getElementById('nm-linearossa'); if (cr) cr.checked = false;
