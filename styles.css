@@ -80,7 +80,8 @@ body {
 /* ══ APP SHELL ════════════════════════════════════════════════════════════════ */
 #app { display: none; flex-direction: column; min-height: 100vh; }
 
-.topBar { background: var(--shell-bg); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.topBar { background: var(--shell-bg); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.stickyHead { position: sticky; top: 0; z-index: 100; }
 .topBarLeft { display: flex; align-items: center; gap: 10px; }
 .topBarLogo { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 14px; color: var(--accent); letter-spacing: .5px; }
 .topBarUser { font-size: 12px; color: var(--shell-muted); }
