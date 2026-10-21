@@ -17,7 +17,7 @@
 // un'anagrafica non rompe le missioni già create.
 
 import {
-  addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp
+  addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { showToast, esc, dialogElimina } from '../shared-utils.js';
 
@@ -255,8 +255,16 @@ window.renameBuilding = function (id) {
 window.toggleBuilding = async function (id, attiva) {
   if (!_requireAdmin()) return;
   try {
-    await updateDoc(doc(window.db, 'ubicazioni', id), { attivo: !!attiva });
-    showToast(attiva ? 'Building riattivato.' : 'Building disattivato.', 'success');
+    // Il building e tutti i suoi punti carico-scarico cambiano stato insieme (un'unica scrittura).
+    // Aree e reparti non vengono modificati: i punti disattivati spariscono da lì finché restano
+    // disattivi e tornano da soli alla riattivazione.
+    const punti = _getState().ubicazioni.filter(u => u.buildingId === id && (u.attivo !== false) !== !!attiva);
+    const batch = writeBatch(window.db);
+    batch.update(doc(window.db, 'ubicazioni', id), { attivo: !!attiva });
+    punti.forEach(u => batch.update(doc(window.db, 'ubicazioni', u.id), { attivo: !!attiva }));
+    await batch.commit();
+    const n = punti.length ? ` (${punti.length} ${punti.length === 1 ? 'punto' : 'punti'} carico-scarico ${attiva ? 'riattivat' : 'disattivat'}${punti.length === 1 ? 'o' : 'i'})` : '';
+    showToast((attiva ? 'Building riattivato' : 'Building disattivato') + n + '.', 'success');
   } catch (e) { showToast('Errore: ' + e.message, 'error'); }
 };
 
@@ -416,13 +424,16 @@ function _gruppoPunti(cfg) {
     if (!list.length) { el.innerHTML = `<div class="emptyState">Nessun ${art.toLowerCase()} creato. Creane uno sopra.</div>`; return; }
     const uMap = {}; st.ubicazioni.forEach(u => { uMap[u.id] = u; });
     el.innerHTML = list.map(a => {
-      const nomi = (a.puntiIds || []).map(i => uMap[i]?.nome).filter(Boolean);
+      // Solo i punti attivi: quelli disattivati (anche via building) non compaiono né si contano
+      const tutti = (a.puntiIds || []).filter(i => uMap[i]);
+      const nomi = tutti.filter(i => uMap[i].attivo !== false).map(i => uMap[i].nome);
+      const nOff = tutti.length - nomi.length;
       const txt = nomi.slice(0, 6).join(', ') + (nomi.length > 6 ? ` … (+${nomi.length - 6})` : '');
       return `
       <div class="rowItem ${a.attivo === false ? 'off' : ''}">
         <div class="rowMain">
           <div class="rowTitle">${esc(a.nome)} ${a.attivo === false ? `<span class="pill off">disattivat${art === 'Area' ? 'a' : 'o'}</span>` : ''}</div>
-          <div class="rowSub">📍 ${nomi.length} ${nomi.length === 1 ? 'punto' : 'punti'}${txt ? ': ' + esc(txt) : ''}</div>
+          <div class="rowSub">📍 ${nomi.length} ${nomi.length === 1 ? 'punto' : 'punti'}${txt ? ': ' + esc(txt) : ''}${nOff ? ` <span style="color:var(--muted)">· ${nOff} disattivat${nOff === 1 ? 'o' : 'i'}</span>` : ''}</div>
         </div>
         <button class="btnIcon" title="Modifica" onclick="rename${Nome}('${esc(a.id)}')">✏️</button>
         <button class="btnIcon" title="${a.attivo === false ? 'Riattiva' : 'Disattiva'}" onclick="toggle${Nome}('${esc(a.id)}',${a.attivo === false})">${a.attivo === false ? '↩️' : '🚫'}</button>
