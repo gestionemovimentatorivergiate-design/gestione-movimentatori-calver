@@ -82,8 +82,8 @@ export function renderInCorso() {
   const avMiss = avTutte.filter(inArea)
     .map(m => ({ ...m, _kind: 'missione', _avail: true }));
 
-  // Presi in carico (propri; l'admin li vede tutti)
-  const tkTutte = st.missioni.filter(m => m.stato === 'in_transito' && (isAdmin || m.navettaId === u.uid));
+  // Presi in carico: solo i propri (quelli presi da altri non si vedono, nemmeno all'admin)
+  const tkTutte = st.missioni.filter(m => m.stato === 'in_transito' && m.navettaId === u.uid);
   const tkMiss = tkTutte.filter(inArea)
     .map(m => ({ ...m, _kind: 'missione', _avail: false }));
 
