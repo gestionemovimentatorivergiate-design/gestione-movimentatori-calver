@@ -168,7 +168,8 @@
     <div class="pageHeader">Storico movimenti</div>
     <div class="pageSubtitle">Tutte le azioni registrate</div>
     <div class="filterBar" style="align-items:flex-end">
-      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Data</div><input type="date" id="st-data" onchange="renderStorico()"></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Dal</div><input type="date" id="st-data" onchange="renderStorico()"></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Al</div><input type="date" id="st-data-a" onchange="renderStorico()"></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Utente</div><select id="st-utente" onchange="renderStorico()"><option value="">Tutti</option></select></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Punto di partenza</div><select id="st-partenza" onchange="renderStorico()"><option value="">Tutti</option></select></div>
       <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Punto di arrivo</div><select id="st-arrivo" onchange="renderStorico()"><option value="">Tutti</option></select></div>
