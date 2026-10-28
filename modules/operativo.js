@@ -272,6 +272,11 @@ function _aggiornaSpunte() {
   const deField = deSel?.closest('.field');
   if (deField) deField.style.display = camion ? 'none' : '';
   if (camion && deSel && deSel.value) { deSel.value = ''; _comboSync('nm-destinazione'); }
+  // Nemmeno l'elemento da spostare serve: si sceglie solo l'origine
+  const elSel = document.getElementById('nm-elemento');
+  const elField = elSel?.closest('.field');
+  if (elField) elField.style.display = camion ? 'none' : '';
+  if (camion && elSel && elSel.value) { elSel.value = ''; _comboSync('nm-elemento'); }
 
   const orId = document.getElementById('nm-origine')?.value;
   const ub = _getState().ubicazioni.find(x => x.id === orId);
@@ -351,15 +356,16 @@ function _oggiGGMMAAAA() {
 window.creaMissione = async function () {
   const u = _getUser();
   const st = _getState();
-  const elId = document.getElementById('nm-elemento').value;
+  let elId = document.getElementById('nm-elemento').value;
   const orId = document.getElementById('nm-origine').value;
   let deId = document.getElementById('nm-destinazione').value;
   // Scarico camion: solo dal reparto RICEZIONE, senza destinazione
   const camion = !!document.getElementById('nm-camion')?.checked && _repartoRicezione();
   if (camion) deId = '';
-  if (!elId || !orId || (!camion && !deId)) { showToast(camion ? 'Seleziona elemento e origine.' : 'Seleziona elemento, origine e destinazione.', 'error'); return; }
+  if (camion) elId = '';
+  if (!orId || (!camion && (!elId || !deId))) { showToast(camion ? 'Seleziona l\'origine.' : 'Seleziona elemento, origine e destinazione.', 'error'); return; }
 
-  const elemento = st.elementi.find(e => e.id === elId);
+  const elemento = camion ? { id: null, codice: '' } : st.elementi.find(e => e.id === elId);
   const origine = st.ubicazioni.find(x => x.id === orId);
   const destinazione = camion ? { id: null, nome: SCARICO_NOME } : st.ubicazioni.find(x => x.id === deId);
   if (!elemento || !origine || !destinazione) { showToast('Dati non validi, riprova.', 'error'); return; }
@@ -389,7 +395,7 @@ window.creaMissione = async function () {
       tx.set(cntRef, { n, giorno });
       tx.set(doc(window.db, 'missioni', codice), {
         codice,
-        elementoId: elId, elementoCodice: elemento.codice,
+        elementoId: camion ? null : elId, elementoCodice: elemento.codice,
         origineId: orId, origineNome: origine.nome,
         destinazioneId: camion ? null : deId, destinazioneNome: destinazione.nome,
         lineaBlu, lineaRossa, vuoto, note,
@@ -406,7 +412,7 @@ window.creaMissione = async function () {
       lineaBlu, lineaRossa, vuoto, note,
       ...(camion ? { scaricoCamion: true } : {}),
     });
-    showToast(`Missione${camion ? ' SCARICO CAMION' : ''}${lineaBlu ? ' LINEA BLU' : ''}${lineaRossa ? ' LINEA ROSSA' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${elemento.codice}${camion ? ' da ' + origine.nome : ' → ' + destinazione.nome}`, 'success');
+    showToast(`Missione${camion ? ' SCARICO CAMION' : ''}${lineaBlu ? ' LINEA BLU' : ''}${lineaRossa ? ' LINEA ROSSA' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${camion ? 'da ' + origine.nome : elemento.codice + ' → ' + destinazione.nome}`, 'success');
     // Reset selezioni
     document.getElementById('nm-elemento').value = '';
     document.getElementById('nm-origine').value = '';
@@ -452,7 +458,7 @@ function _cardMissioneAttesa(m) {
     <div class="mCard pieno"${_styleBlu(m)}>
       <div class="mHead">
         ${m.codice ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;letter-spacing:.5px;color:var(--muted)">${esc(m.codice)}</span>` : ''}
-        <span class="mElemento">${esc(m.elementoCodice)}</span>
+        ${m.elementoCodice ? `<span class="mElemento">${esc(m.elementoCodice)}</span>` : ''}
         ${_badgeBlu(m)}
         ${_badgeRossa(m)}
         ${_badgeVuoto(m)}
@@ -498,7 +504,7 @@ window.modificaMissione = function (id) {
   { let dn = false; ov.addEventListener('mousedown', e => { dn = e.target === ov; }); ov.onclick = e => { if (e.target === ov && dn) ov.remove(); }; }
   ov.innerHTML = `<div class="modalBox">
     <h3>Modifica missione${m.codice ? ' ' + esc(m.codice) : ''}</h3>
-    <div class="field"><label>Elemento da spostare</label><select id="mm-elemento">${opt(elementi, 'codice', m.elementoId)}</select></div>
+    ${m.scaricoCamion ? '' : `<div class="field"><label>Elemento da spostare</label><select id="mm-elemento">${opt(elementi, 'codice', m.elementoId)}</select></div>`}
     <div class="field"><label>Origine</label><select id="mm-origine">${opt(ubic, 'nome', m.origineId)}</select></div>
     ${m.scaricoCamion ? '' : `<div class="field"><label>Destinazione</label><select id="mm-destinazione">${opt(ubic, 'nome', m.destinazioneId)}</select></div>`}
     <div class="field"><label>Note <span class="opt">(facoltativo)</span></label><textarea id="mm-note" rows="2" maxlength="300" placeholder="Eventuali indicazioni per il movimentatore (non obbligatorio)">${esc(m.note || '')}</textarea></div>
@@ -537,7 +543,7 @@ window.modificaMissione = function (id) {
 
   $('mm-annulla').onclick = () => ov.remove();
   $('mm-salva').onclick = async () => {
-    const el = st.elementi.find(x => x.id === $('mm-elemento').value);
+    const el = camion ? { id: null, codice: '' } : st.elementi.find(x => x.id === $('mm-elemento').value);
     const orig = st.ubicazioni.find(x => x.id === $('mm-origine').value);
     const dest = camion ? { id: null, nome: SCARICO_NOME } : st.ubicazioni.find(x => x.id === $('mm-destinazione').value);
     if (!el || !orig || !dest) { showToast('Seleziona elemento, origine e destinazione.', 'error'); return; }
@@ -621,7 +627,7 @@ window.annullaMissione = async function (id) {
   if (m.ownerUid !== u.uid) { showToast('Puoi annullare solo le tue missioni.', 'error'); return; }
   const ok = await _dialogConferma({
     titolo: 'Annulla missione' + (m.codice ? ' ' + m.codice : ''),
-    corpo: `<div style="font-size:15px;font-weight:700;margin-bottom:6px">${esc(m.elementoCodice)}</div>
+    corpo: `${m.elementoCodice ? `<div style="font-size:15px;font-weight:700;margin-bottom:6px">${esc(m.elementoCodice)}</div>` : ''}
       <div class="mRoute" style="margin-bottom:10px"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
       <div style="font-size:13px;color:var(--muted)">La missione verrà annullata e non sarà più disponibile per i movimentatori. L'operazione non si può annullare.</div>`,
     okLabel: '✕ Annulla missione', backLabel: 'Indietro', danger: true,

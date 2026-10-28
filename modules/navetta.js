@@ -182,7 +182,7 @@ function _card(item) {
     <div class="mCard pieno"${blu ? ' style="border-left:4px solid #2563eb;"' : item.lineaRossa ? ' style="border-left:4px solid #dc2626;"' : ''}>
       <div class="mHead">
         ${item.codice ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;letter-spacing:.5px;color:var(--muted)">${esc(item.codice)}</span>` : ''}
-        <span class="mElemento">${esc(item.elementoCodice)}</span>
+        ${item.elementoCodice ? `<span class="mElemento">${esc(item.elementoCodice)}</span>` : ''}
         ${badgeBlu}
         ${badgeRossa}
         ${badgeVuoto}
@@ -339,7 +339,7 @@ window.confermaMissione = function (id) {
     { let dn = false; ovc.addEventListener('mousedown', e => { dn = e.target === ovc; }); ovc.onclick = e => { if (e.target === ovc && dn) ovc.remove(); }; }
     ovc.innerHTML = `<div class="modalBox">
       <h3>Conferma scarico camion${m.codice ? ' ' + esc(m.codice) : ''}</h3>
-      <div style="font-size:15px;font-weight:700;margin-bottom:6px">${esc(m.elementoCodice)}</div>
+      ${m.elementoCodice ? `<div style="font-size:15px;font-weight:700;margin-bottom:6px">${esc(m.elementoCodice)}</div>` : ''}
       <div style="font-size:13px;color:var(--muted);margin-bottom:2px">Punto di origine</div>
       <div style="font-size:20px;font-weight:800;margin-bottom:14px">${esc(m.origineNome)}</div>
       <div id="cs-msg" style="display:none;margin-bottom:10px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;background:#dc262622;color:#b91c1c"></div>
