@@ -50,13 +50,14 @@ export function renderStorico() {
   const fPar = fill('st-partenza', H.map(h => h.origine),      'Tutti');
   const fArr = fill('st-arrivo',   H.map(h => h.destinazione), 'Tutti');
   const fConf = document.getElementById('st-conferma')?.value || '';
-  const fData = document.getElementById('st-data')?.value || '';          // aaaa-mm-gg
+  const fData = document.getElementById('st-data')?.value || '';          // Dal, aaaa-mm-gg
+  const fDataA = document.getElementById('st-data-a')?.value || '';       // Al, aaaa-mm-gg
   const fId = (document.getElementById('st-id')?.value || '').trim().toLowerCase();
   const giorno = h => h.ts ? h.ts.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }) : '';
 
   // Nessun filtro attivo → si mostrano solo i movimenti dell'ultima settimana.
   // Con almeno un filtro attivo la ricerca copre tutte le voci caricate.
-  const nessunFiltro = !fAz && !fUt && !fPer && !fPar && !fArr && !fEl && !fConf && !fData && !fId;
+  const nessunFiltro = !fAz && !fUt && !fPer && !fPar && !fArr && !fEl && !fConf && !fData && !fDataA && !fId;
   const da = Date.now() - 7 * 24 * 3600 * 1000;
 
   // Una missione compare se almeno una sua voce rispetta TUTTI i filtri (AND);
@@ -79,7 +80,8 @@ export function renderStorico() {
     (!fArr || h.destinazione === fArr) &&
     (!fConf || confTipo(h) === fConf) &&
     (!fEl  || h.elemento === fEl) &&
-    (!fData || giorno(h) === fData) &&
+    (!fData || giorno(h) >= fData) &&
+    (!fDataA || (giorno(h) && giorno(h) <= fDataA)) &&
     (!fId  || (h.codice || '').toLowerCase().includes(fId))).map(chiave));
 
   const tv = h => h.ts ? h.ts.getTime() : Number.MAX_SAFE_INTEGER;
@@ -824,7 +826,7 @@ window.scaricaStoricoExcel = function () {
 };
 
 window.resetFiltriStorico = function () {
-  ['st-data', 'st-id', 'st-utente', 'st-percorso', 'st-partenza', 'st-arrivo', 'st-elemento', 'st-azione', 'st-conferma'].forEach(id => {
+  ['st-data', 'st-data-a', 'st-id', 'st-utente', 'st-percorso', 'st-partenza', 'st-arrivo', 'st-elemento', 'st-azione', 'st-conferma'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   renderStorico();
