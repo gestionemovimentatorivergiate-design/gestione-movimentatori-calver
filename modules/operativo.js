@@ -116,6 +116,14 @@ function _filtraDestinazione() {
   _comboSync('nm-destinazione');
 }
 
+// Scarico camion: missione senza destinazione, creabile solo dal reparto RICEZIONE
+const SCARICO_NOME = 'SCARICO CAMION';
+const _repartoRicezione = () => {
+  const id = document.getElementById('nm-reparto')?.value;
+  const r = id && (_getState().reparti || []).find(x => x.id === id);
+  return !!r && String(r.nome || '').trim().toLowerCase() === 'ricezione';
+};
+
 export function renderNuovaMissione() {
   const st = _getState();
   const elSel = document.getElementById('nm-elemento');
@@ -208,6 +216,22 @@ export function renderNuovaMissione() {
       anchor.parentNode.insertBefore(wrap, anchor.id === 'nm-btn' ? anchor : anchor.nextSibling);
     }
   }
+  // Spunta "Scarico camion": subito dopo Vuoto; attiva solo con il reparto RICEZIONE
+  if (!document.getElementById('nm-camion')) {
+    const anchor = document.getElementById('nm-vuoto-wrap') || document.getElementById('nm-btn');
+    if (anchor && anchor.parentNode) {
+      const wrap = document.createElement('label');
+      wrap.id = 'nm-camion-wrap';
+      wrap.style.cssText = 'display:flex;align-items:center;gap:10px;margin:12px 0;padding:10px 12px;' +
+        'border:1px solid #b4530955;border-radius:8px;background:#b4530912;cursor:pointer;' +
+        'font-weight:700;user-select:none';
+      wrap.innerHTML = '<input type="checkbox" id="nm-camion" style="width:20px;height:20px;margin:0;accent-color:#b45309;cursor:pointer">' +
+        '<span>🚛 Scarico camion</span>' +
+        '<span id="nm-camion-hint" style="font-size:11px;font-weight:500;color:var(--muted);margin-left:auto"></span>';
+      anchor.parentNode.insertBefore(wrap, anchor.id === 'nm-btn' ? anchor : anchor.nextSibling);
+    }
+  }
+  const cbCamion = document.getElementById('nm-camion'); if (cbCamion) cbCamion.onchange = _aggiornaSpunte;
   orSel.onchange = () => { _filtraDestinazione(); _aggiornaSpunte(); };
   const cbBlu = document.getElementById('nm-lineablu'); if (cbBlu) cbBlu.onchange = _aggiornaSpunte;
   const cbRossa = document.getElementById('nm-linearossa'); if (cbRossa) cbRossa.onchange = _aggiornaSpunte;
@@ -227,7 +251,27 @@ function _aggiornaSpunte() {
   const cbBlu = document.getElementById('nm-lineablu');
   const cbRossa = document.getElementById('nm-linearossa');
   const cbVuoto = document.getElementById('nm-vuoto');
+  const cbCamion = document.getElementById('nm-camion');
   if (!cbBlu || !cbRossa || !cbVuoto) return;
+
+  // Scarico camion: solo con il reparto RICEZIONE; esclude tutte le altre spunte e la destinazione
+  const ricezione = _repartoRicezione();
+  if (cbCamion && !ricezione) cbCamion.checked = false;
+  const camion = !!cbCamion && cbCamion.checked;
+  const altraSel = cbBlu.checked || cbRossa.checked || cbVuoto.checked;
+  const camionOk = !!cbCamion && ricezione && !altraSel;
+  if (cbCamion) {
+    cbCamion.disabled = !camionOk && !camion;
+    const w = document.getElementById('nm-camion-wrap');
+    if (w) { const ok = camionOk || camion; w.style.opacity = ok ? '1' : '.5'; w.style.cursor = ok ? 'pointer' : 'not-allowed'; }
+    const h = document.getElementById('nm-camion-hint');
+    if (h) h.textContent = camion ? 'Senza destinazione' : !ricezione ? 'Solo per il reparto RICEZIONE' : altraSel ? 'Non compatibile con le altre spunte' : '';
+  }
+  // La destinazione non serve: il campo sparisce e si svuota
+  const deSel = document.getElementById('nm-destinazione');
+  const deField = deSel?.closest('.field');
+  if (deField) deField.style.display = camion ? 'none' : '';
+  if (camion && deSel && deSel.value) { deSel.value = ''; _comboSync('nm-destinazione'); }
 
   const orId = document.getElementById('nm-origine')?.value;
   const ub = _getState().ubicazioni.find(x => x.id === orId);
@@ -236,9 +280,9 @@ function _aggiornaSpunte() {
   // Se l'origine non è B26 la Linea Blu non può restare spuntata
   if (!origineOk) cbBlu.checked = false;
 
-  const bluOk = origineOk && !cbRossa.checked && !cbVuoto.checked;
-  const rossaOk = !cbBlu.checked && !cbVuoto.checked;
-  const vuotoOk = !cbBlu.checked && !cbRossa.checked;
+  const bluOk = !camion && origineOk && !cbRossa.checked && !cbVuoto.checked;
+  const rossaOk = !camion && !cbBlu.checked && !cbVuoto.checked;
+  const vuotoOk = !camion && !cbBlu.checked && !cbRossa.checked;
   cbBlu.disabled = !bluOk;
   cbRossa.disabled = !rossaOk;
   cbVuoto.disabled = !vuotoOk;
@@ -254,11 +298,11 @@ function _aggiornaSpunte() {
   const altra = (...n) => 'Non compatibile con ' + n.join(' / ');
   const hBlu = document.getElementById('nm-lineablu-hint');
   if (hBlu) hBlu.textContent = bluOk ? ''
-    : (cbRossa.checked ? altra('Linea Rossa') : cbVuoto.checked ? altra('Vuoto') : `Solo per origini del building ${LINEA_BLU_BUILDING}`);
+    : camion ? altra('Scarico camion') : (cbRossa.checked ? altra('Linea Rossa') : cbVuoto.checked ? altra('Vuoto') : `Solo per origini del building ${LINEA_BLU_BUILDING}`);
   const hRossa = document.getElementById('nm-linearossa-hint');
-  if (hRossa) hRossa.textContent = rossaOk ? '' : (cbBlu.checked ? altra('Linea Blu') : altra('Vuoto'));
+  if (hRossa) hRossa.textContent = rossaOk ? '' : camion ? altra('Scarico camion') : (cbBlu.checked ? altra('Linea Blu') : altra('Vuoto'));
   const hVuoto = document.getElementById('nm-vuoto-hint');
-  if (hVuoto) hVuoto.textContent = vuotoOk ? '' : (cbBlu.checked ? altra('Linea Blu') : altra('Linea Rossa'));
+  if (hVuoto) hVuoto.textContent = vuotoOk ? '' : camion ? altra('Scarico camion') : (cbBlu.checked ? altra('Linea Blu') : altra('Linea Rossa'));
 }
 
 // Badge + stile per le missioni Linea Blu (priorità)
@@ -276,6 +320,11 @@ function _badgeRossa(m) {
 function _badgeVuoto(m) {
   return m.vuoto
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#16a34a;color:#fff;letter-spacing:.3px">🟢 VUOTO</span>'
+    : '';
+}
+function _badgeCamion(m) {
+  return m.scaricoCamion
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#b45309;color:#fff;letter-spacing:.3px">🚛 SCARICO CAMION</span>'
     : '';
 }
 function _styleBlu(m) {
@@ -304,21 +353,24 @@ window.creaMissione = async function () {
   const st = _getState();
   const elId = document.getElementById('nm-elemento').value;
   const orId = document.getElementById('nm-origine').value;
-  const deId = document.getElementById('nm-destinazione').value;
-  if (!elId || !orId || !deId) { showToast('Seleziona elemento, origine e destinazione.', 'error'); return; }
+  let deId = document.getElementById('nm-destinazione').value;
+  // Scarico camion: solo dal reparto RICEZIONE, senza destinazione
+  const camion = !!document.getElementById('nm-camion')?.checked && _repartoRicezione();
+  if (camion) deId = '';
+  if (!elId || !orId || (!camion && !deId)) { showToast(camion ? 'Seleziona elemento e origine.' : 'Seleziona elemento, origine e destinazione.', 'error'); return; }
 
   const elemento = st.elementi.find(e => e.id === elId);
   const origine = st.ubicazioni.find(x => x.id === orId);
-  const destinazione = st.ubicazioni.find(x => x.id === deId);
+  const destinazione = camion ? { id: null, nome: SCARICO_NOME } : st.ubicazioni.find(x => x.id === deId);
   if (!elemento || !origine || !destinazione) { showToast('Dati non validi, riprova.', 'error'); return; }
-  if (orId === deId) { showToast('Origine e destinazione non possono coincidere.', 'error'); return; }
+  if (!camion && orId === deId) { showToast('Origine e destinazione non possono coincidere.', 'error'); return; }
 
   // Linea Blu valida solo se l'origine appartiene al building B26
-  const vuoto = !!document.getElementById('nm-vuoto')?.checked;
+  const vuoto = !camion && !!document.getElementById('nm-vuoto')?.checked;
   const note = (document.getElementById('nm-note')?.value || '').trim().slice(0, 300);
-  const rossaSel = !!document.getElementById('nm-linearossa')?.checked;
+  const rossaSel = !camion && !!document.getElementById('nm-linearossa')?.checked;
   // Mutuamente esclusive: Linea Blu, Linea Rossa e Vuoto non vengono mai salvate insieme
-  const lineaBlu = !vuoto && !rossaSel && !!document.getElementById('nm-lineablu')?.checked
+  const lineaBlu = !camion && !vuoto && !rossaSel && !!document.getElementById('nm-lineablu')?.checked
     && origine.buildingId === LINEA_BLU_BUILDING;
   const lineaRossa = !vuoto && !lineaBlu && rossaSel;
 
@@ -339,8 +391,9 @@ window.creaMissione = async function () {
         codice,
         elementoId: elId, elementoCodice: elemento.codice,
         origineId: orId, origineNome: origine.nome,
-        destinazioneId: deId, destinazioneNome: destinazione.nome,
+        destinazioneId: camion ? null : deId, destinazioneNome: destinazione.nome,
         lineaBlu, lineaRossa, vuoto, note,
+        ...(camion ? { scaricoCamion: true } : {}),
         stato: 'richiesta',
         navettaId: null, navettaNome: null,
         ownerUid: u.uid, ownerNome: u.name || u.email,
@@ -351,8 +404,9 @@ window.creaMissione = async function () {
       action: 'Missione creata', codice, elemento: elemento.codice,
       origine: origine.nome, destinazione: destinazione.nome,
       lineaBlu, lineaRossa, vuoto, note,
+      ...(camion ? { scaricoCamion: true } : {}),
     });
-    showToast(`Missione${lineaBlu ? ' LINEA BLU' : ''}${lineaRossa ? ' LINEA ROSSA' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${elemento.codice} → ${destinazione.nome}`, 'success');
+    showToast(`Missione${camion ? ' SCARICO CAMION' : ''}${lineaBlu ? ' LINEA BLU' : ''}${lineaRossa ? ' LINEA ROSSA' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${elemento.codice}${camion ? ' da ' + origine.nome : ' → ' + destinazione.nome}`, 'success');
     // Reset selezioni
     document.getElementById('nm-elemento').value = '';
     document.getElementById('nm-origine').value = '';
@@ -362,6 +416,7 @@ window.creaMissione = async function () {
     const cb = document.getElementById('nm-lineablu'); if (cb) cb.checked = false;
     const cr = document.getElementById('nm-linearossa'); if (cr) cr.checked = false;
     const cv = document.getElementById('nm-vuoto'); if (cv) cv.checked = false;
+    const cc = document.getElementById('nm-camion'); if (cc) cc.checked = false;
     _aggiornaSpunte();
   } catch (e) {
     showToast('Errore: ' + e.message, 'error');
@@ -401,6 +456,7 @@ function _cardMissioneAttesa(m) {
         ${_badgeBlu(m)}
         ${_badgeRossa(m)}
         ${_badgeVuoto(m)}
+        ${_badgeCamion(m)}
         <span class="mStatoBadge richiesta">In attesa</span>
       </div>
       <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
@@ -444,11 +500,11 @@ window.modificaMissione = function (id) {
     <h3>Modifica missione${m.codice ? ' ' + esc(m.codice) : ''}</h3>
     <div class="field"><label>Elemento da spostare</label><select id="mm-elemento">${opt(elementi, 'codice', m.elementoId)}</select></div>
     <div class="field"><label>Origine</label><select id="mm-origine">${opt(ubic, 'nome', m.origineId)}</select></div>
-    <div class="field"><label>Destinazione</label><select id="mm-destinazione">${opt(ubic, 'nome', m.destinazioneId)}</select></div>
+    ${m.scaricoCamion ? '' : `<div class="field"><label>Destinazione</label><select id="mm-destinazione">${opt(ubic, 'nome', m.destinazioneId)}</select></div>`}
     <div class="field"><label>Note <span class="opt">(facoltativo)</span></label><textarea id="mm-note" rows="2" maxlength="300" placeholder="Eventuali indicazioni per il movimentatore (non obbligatorio)">${esc(m.note || '')}</textarea></div>
-    ${box('mm-blu', '#2563eb', '🔵 Linea Blu')}
+    ${m.scaricoCamion ? '<div style="margin:8px 0;padding:10px 12px;border-radius:8px;background:#b4530912;border:1px solid #b4530955;font-weight:700">🚛 Scarico camion <span style="font-size:11px;font-weight:500;color:var(--muted)">(senza destinazione)</span></div>' : `${box('mm-blu', '#2563eb', '🔵 Linea Blu')}
     ${box('mm-rossa', '#dc2626', '🔴 Linea Rossa')}
-    ${box('mm-vuoto', '#16a34a', '🟢 Vuoto')}
+    ${box('mm-vuoto', '#16a34a', '🟢 Vuoto')}`}
     <div class="modalActions">
       <button class="btnGray" id="mm-annulla">Chiudi</button>
       <button class="btnGreen" id="mm-salva">Salva modifiche</button>
@@ -456,7 +512,8 @@ window.modificaMissione = function (id) {
   document.body.appendChild(ov);
 
   const $ = x => document.getElementById(x);
-  $('mm-blu').checked = !!m.lineaBlu; $('mm-rossa').checked = !!m.lineaRossa; $('mm-vuoto').checked = !!m.vuoto;
+  const camion = !!m.scaricoCamion;
+  if (!camion) { $('mm-blu').checked = !!m.lineaBlu; $('mm-rossa').checked = !!m.lineaRossa; $('mm-vuoto').checked = !!m.vuoto; }
 
   // Stesse regole della creazione: le tre spunte sono mutuamente esclusive e
   // la Linea Blu richiede un'origine del building B26.
@@ -473,22 +530,24 @@ window.modificaMissione = function (id) {
       $(cid + '-hint').textContent = ok[k] ? '' : (k === 'blu' && !okB ? `Solo per origini del building ${LINEA_BLU_BUILDING}` : 'Non compatibile con la spunta scelta');
     });
   };
-  ['mm-origine', 'mm-blu', 'mm-rossa', 'mm-vuoto'].forEach(x => { $(x).onchange = regole; });
-  regole();
+  if (!camion) {
+    ['mm-origine', 'mm-blu', 'mm-rossa', 'mm-vuoto'].forEach(x => { $(x).onchange = regole; });
+    regole();
+  }
 
   $('mm-annulla').onclick = () => ov.remove();
   $('mm-salva').onclick = async () => {
     const el = st.elementi.find(x => x.id === $('mm-elemento').value);
     const orig = st.ubicazioni.find(x => x.id === $('mm-origine').value);
-    const dest = st.ubicazioni.find(x => x.id === $('mm-destinazione').value);
+    const dest = camion ? { id: null, nome: SCARICO_NOME } : st.ubicazioni.find(x => x.id === $('mm-destinazione').value);
     if (!el || !orig || !dest) { showToast('Seleziona elemento, origine e destinazione.', 'error'); return; }
     const nuovo = {
       elementoId: el.id, elementoCodice: el.codice,
       origineId: orig.id, origineNome: orig.nome,
       destinazioneId: dest.id, destinazioneNome: dest.nome,
-      lineaBlu: $('mm-blu').checked && orig.buildingId === LINEA_BLU_BUILDING,
-      lineaRossa: $('mm-rossa').checked,
-      vuoto: $('mm-vuoto').checked,
+      lineaBlu: !camion && $('mm-blu').checked && orig.buildingId === LINEA_BLU_BUILDING,
+      lineaRossa: !camion && $('mm-rossa').checked,
+      vuoto: !camion && $('mm-vuoto').checked,
       note: ($('mm-note').value || '').trim().slice(0, 300),
     };
     const diff = [];

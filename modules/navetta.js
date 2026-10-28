@@ -158,7 +158,7 @@ function _card(item) {
     meta = `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">`
       + (item.navettaNome ? `<span style="font-size:19px;font-weight:800;color:var(--text);line-height:1.2">👤 ${esc(item.navettaNome)}</span>` : '')
       + `<span style="font-size:12px;color:var(--muted)">in carico da ${fmtDur(item.presaInCaricoAt)}</span></div>`;
-    actionBtn = `<button class="btnGreen" onclick="confermaMissione('${item.id}')">✅ Conferma consegna</button>`;
+    actionBtn = `<button class="btnGreen" onclick="confermaMissione('${item.id}')">${item.scaricoCamion ? '✅ Conferma scarico' : '✅ Conferma consegna'}</button>`;
   }
 
   const blu = !!item.lineaBlu;
@@ -174,6 +174,10 @@ function _card(item) {
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#16a34a;color:#fff;letter-spacing:.3px">🟢 VUOTO</span>'
     : '';
 
+  const badgeCamion = item.scaricoCamion
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#b45309;color:#fff;letter-spacing:.3px">🚛 SCARICO CAMION</span>'
+    : '';
+
   return `
     <div class="mCard pieno"${blu ? ' style="border-left:4px solid #2563eb;"' : item.lineaRossa ? ' style="border-left:4px solid #dc2626;"' : ''}>
       <div class="mHead">
@@ -182,6 +186,7 @@ function _card(item) {
         ${badgeBlu}
         ${badgeRossa}
         ${badgeVuoto}
+        ${badgeCamion}
         ${statoBadge}
       </div>
       <div class="mRoute"><span class="mLoc">${esc(item.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(item.destinazioneNome)}</span></div>
@@ -325,6 +330,43 @@ window.confermaMissione = function (id) {
   if (!m) return;
   _fermaScanner();
   document.getElementById('modalConfermaConsegna')?.remove();
+
+  // Scarico camion: nessuna destinazione né barcode, basta la conferma manuale
+  if (m.scaricoCamion) {
+    const ovc = document.createElement('div');
+    ovc.className = 'modalOverlay open';
+    ovc.id = 'modalConfermaConsegna';
+    { let dn = false; ovc.addEventListener('mousedown', e => { dn = e.target === ovc; }); ovc.onclick = e => { if (e.target === ovc && dn) ovc.remove(); }; }
+    ovc.innerHTML = `<div class="modalBox">
+      <h3>Conferma scarico camion${m.codice ? ' ' + esc(m.codice) : ''}</h3>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">${esc(m.elementoCodice)}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:2px">Punto di origine</div>
+      <div style="font-size:20px;font-weight:800;margin-bottom:14px">${esc(m.origineNome)}</div>
+      <div id="cs-msg" style="display:none;margin-bottom:10px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;background:#dc262622;color:#b91c1c"></div>
+      <div class="modalActions">
+        <button class="btnGray" id="cs-back">Annulla</button>
+        <button class="btnGreen" id="cs-ok">✅ Conferma scarico</button>
+      </div></div>`;
+    document.body.appendChild(ovc);
+    document.getElementById('cs-back').onclick = () => ovc.remove();
+    document.getElementById('cs-ok').onclick = async () => {
+      const ok = document.getElementById('cs-ok'); ok.disabled = true; ok.textContent = '⏳ Conferma…';
+      try {
+        await _conferma('missioni', id, 'in_transito', 'consegnata', 'consegnataAt', { consegnaMetodo: 'manuale' });
+        await window.logHistory({
+          action: 'Consegna completata', codice: m.codice || null, elemento: m.elementoCodice,
+          origine: m.origineNome, destinazione: m.destinazioneNome,
+          dettaglio: 'Scarico camion confermato manualmente',
+        });
+        ovc.remove();
+        showToast('Scarico confermato.', 'success');
+      } catch (e) {
+        ok.disabled = false; ok.textContent = '✅ Conferma scarico';
+        const mm = document.getElementById('cs-msg'); mm.style.display = 'block'; mm.textContent = e.message || 'Errore';
+      }
+    };
+    return;
+  }
 
   const bMap = {}; st.buildings.forEach(b => { bMap[b.id] = b; });
   const etichetta = ub => {

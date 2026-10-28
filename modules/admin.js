@@ -281,7 +281,7 @@ export function renderStatistiche() {
 
   const fOp = _msFill('ss-op', opG(ops), 'Tutti');
   const fEl = _msFill('ss-elemento', opG(els), 'Tutti');
-  const fTipo = _msFill('ss-tipo', [{ items: [{ v: 'lineaBlu', l: 'Linea Blu' }, { v: 'lineaRossa', l: 'Linea Rossa' }, { v: 'vuoto', l: 'Vuoti' }] }], 'Tutte');
+  const fTipo = _msFill('ss-tipo', [{ items: [{ v: 'lineaBlu', l: 'Linea Blu' }, { v: 'lineaRossa', l: 'Linea Rossa' }, { v: 'vuoto', l: 'Vuoti' }, { v: 'scaricoCamion', l: 'Scarico camion' }] }], 'Tutte');
   const fBp = _msFill('ss-bp', bpG, 'Tutti');
   // Aree di movimentazione (per destinazione della missione)
   const aree = (st.aree || []).slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
