@@ -334,6 +334,28 @@ const _isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAg
 
 const _norm = s => String(s ?? '').trim().toUpperCase().replace(/\s+/g, '');
 
+// Domanda "rilasciato al coperto?" (Sì/No). Si chiude solo con uno dei due pulsanti.
+function _chiediCoperto() {
+  return new Promise(resolve => {
+    document.getElementById('modalCoperto')?.remove();
+    const ov = document.createElement('div');
+    ov.className = 'modalOverlay open';
+    ov.id = 'modalCoperto';
+    ov.style.zIndex = '10000';
+    ov.innerHTML = `<div class="modalBox">
+      <h3>☂️ Al coperto</h3>
+      <div style="font-size:16px;font-weight:700;margin:6px 0 16px">Il materiale è stato rilasciato al coperto?</div>
+      <div class="modalActions">
+        <button class="btnRed" id="cop-no">NO</button>
+        <button class="btnGreen" id="cop-si">SÌ</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const fine = v => { ov.remove(); resolve(v); };
+    document.getElementById('cop-no').onclick = () => fine(false);
+    document.getElementById('cop-si').onclick = () => fine(true);
+  });
+}
+
 window.confermaMissione = function (id) {
   const st = _getState();
   const m = st.missioni.find(x => x.id === id);
@@ -435,14 +457,29 @@ window.confermaMissione = function (id) {
     }
     inCorso = true; _fermaScanner();
     if ($('cd-manuale')) $('cd-manuale').disabled = true; if ($('cd-scan')) $('cd-scan').disabled = true;
+    // Missione "Al coperto": dopo lo scan si chiede se il materiale è stato lasciato al coperto.
+    // NO → si torna alla scansione e la domanda viene riproposta dopo il nuovo scan.
+    if (m.coperto) {
+      const alCoperto = await _chiediCoperto();
+      if (!alCoperto) {
+        inCorso = false; ultimo = ''; ultimoT = 0;
+        if ($('cd-manuale')) $('cd-manuale').disabled = false;
+        if ($('cd-scan')) { $('cd-scan').disabled = false; $('cd-scan').style.display = ''; }
+        if ($('cd-cam')) $('cd-cam').style.display = 'none';
+        msg(mobile ? 'Lascia il materiale al coperto, poi scansiona di nuovo il barcode.'
+                   : 'Lascia il materiale al coperto, poi conferma di nuovo il punto di consegna.', false);
+        return;
+      }
+    }
     try {
       await _conferma('missioni', id, 'in_transito', 'consegnata', 'consegnataAt', {
         consegnaMetodo: metodo, consegnaPuntoId: ub.id, consegnaPuntoNome: ub.nome,
+        ...(m.coperto ? { consegnaCoperto: true } : {}),
       });
       await window.logHistory({
         action: 'Consegna completata', codice: m.codice || null, elemento: m.elementoCodice,
         origine: m.origineNome, destinazione: m.destinazioneNome,
-        dettaglio: metodo === 'scansione' ? 'Confermata con scansione barcode' : 'Confermata manualmente (menù)',
+        dettaglio: (metodo === 'scansione' ? 'Confermata con scansione barcode' : 'Confermata manualmente (menù)') + (m.coperto ? ' · Rilasciato al coperto' : ''),
       });
       ov.remove();
       showToast('Consegna confermata.', 'success');
