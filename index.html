@@ -202,11 +202,26 @@
   <div class="page" id="pageDisimballi">
     <div class="pageHeader">Disimballi</div>
     <div class="pageSubtitle">Missioni completate con spunta Disimballo</div>
-    <div class="pageSubtitle" id="dis-count" style="margin-top:-4px"></div>
+    <div class="filterBar" style="align-items:flex-end">
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Elemento</div><select id="dis-f-el" onchange="renderDisimballi()"><option value="">Tutti</option></select></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Punto di origine</div><select id="dis-f-or" onchange="renderDisimballi()"><option value="">Tutti</option></select></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Punto di conferma</div><select id="dis-f-pc" onchange="renderDisimballi()"><option value="">Tutti</option></select></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Giorno</div><input type="date" id="dis-f-gg" onchange="renderDisimballi()"></div>
+      <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Ora</div><select id="dis-f-hh" onchange="renderDisimballi()"><option value="">Tutte</option><option value="00">00:00 – 00:59</option><option value="01">01:00 – 01:59</option><option value="02">02:00 – 02:59</option><option value="03">03:00 – 03:59</option><option value="04">04:00 – 04:59</option><option value="05">05:00 – 05:59</option><option value="06">06:00 – 06:59</option><option value="07">07:00 – 07:59</option><option value="08">08:00 – 08:59</option><option value="09">09:00 – 09:59</option><option value="10">10:00 – 10:59</option><option value="11">11:00 – 11:59</option><option value="12">12:00 – 12:59</option><option value="13">13:00 – 13:59</option><option value="14">14:00 – 14:59</option><option value="15">15:00 – 15:59</option><option value="16">16:00 – 16:59</option><option value="17">17:00 – 17:59</option><option value="18">18:00 – 18:59</option><option value="19">19:00 – 19:59</option><option value="20">20:00 – 20:59</option><option value="21">21:00 – 21:59</option><option value="22">22:00 – 22:59</option><option value="23">23:00 – 23:59</option></select></div>
+      <button class="btnGray btnSmall" onclick="resetFiltriDisimballi()">✕ Resetta filtri</button>
+    </div>
+    <div class="groupTitle" style="margin-top:14px">📦 Disimballi DA FARE <span id="dis-count-da"></span></div>
     <div class="tableWrap">
       <table>
-        <thead><tr><th>Data</th><th>Ora conferma</th><th>ID missione</th><th>Elemento</th><th>Punto di conferma</th><th>Provenienza</th><th>Note</th></tr></thead>
+        <thead><tr><th>Data</th><th>Ora conferma</th><th>ID missione</th><th>Elemento</th><th>Punto di origine</th><th>Punto di conferma</th><th>Note</th><th style="text-align:center">Fatto</th></tr></thead>
         <tbody id="dis-body"></tbody>
+      </table>
+    </div>
+    <div class="groupTitle" style="margin-top:22px">✅ Disimballi FATTI <span id="dis-count-fatti"></span></div>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>Data</th><th>Ora conferma</th><th>ID missione</th><th>Elemento</th><th>Punto di origine</th><th>Punto di conferma</th><th>Note</th><th>Ora di disimballo</th></tr></thead>
+        <tbody id="dis-body-fatti"></tbody>
       </table>
     </div>
   </div>
