@@ -76,7 +76,6 @@ export function htmlFoglio({ codice, createdAt, buildingPartenza, destinazione }
     .ca { position: absolute; left: 8mm; top: 74mm; font: italic 700 13pt Arial, Helvetica, sans-serif; }
     .ca-riga { position: absolute; left: 7mm; width: 85mm; top: 85.5mm; border-bottom: 0.4mm solid #000; }
     .colli { font-size: 18pt; white-space: nowrap; }
-    .angolo { right: 0; bottom: 0; width: 100mm; height: 40mm; }
   `;
   const fabDa = _fabbrica(32, 72, 99.5, 91.3, 'Da:', 6, 42, buildingPartenza || '—', 54, 34);
   const fabA = _fabbrica(161.5, 71, 101, 94, 'A:', 9, 41, destinazione || '—', 52, 20,
@@ -101,7 +100,6 @@ export function htmlFoglio({ codice, createdAt, buildingPartenza, destinazione }
   <img class="abs" src="${IMG.box2}" style="left:152mm;top:172mm;width:12.6mm" alt="">
   <div class="abs colli" style="left:168mm;top:172mm">nr. colli parziale: ___ di ___</div>
 
-  <svg class="abs angolo" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M0 40 Q 70 36 100 0 L100 40 Z" fill="#f00"/></svg>
 </div>
 </body></html>`;
 }
