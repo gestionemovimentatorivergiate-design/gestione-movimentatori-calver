@@ -288,7 +288,7 @@ export function renderStatistiche() {
 
   const fOp = _msFill('ss-op', opG(ops), 'Tutti');
   const fEl = _msFill('ss-elemento', opG(els), 'Tutti');
-  const fTipo = _msFill('ss-tipo', [{ items: [{ v: 'lineaBlu', l: 'Linea Blu' }, { v: 'lineaRossa', l: 'Linea Rossa' }, { v: 'vuoto', l: 'Vuoti' }, { v: 'scaricoCamion', l: 'Scarico camion' }, { v: 'disimballo', l: 'Disimballo' }] }], 'Tutte');
+  const fTipo = _msFill('ss-tipo', [{ items: [{ v: 'lineaBlu', l: 'Linea Blu' }, { v: 'lineaRossa', l: 'Linea Rossa' }, { v: 'vuoto', l: 'Vuoti' }, { v: 'scaricoCamion', l: 'Scarico camion' }, { v: 'disimballo', l: 'Disimballo' }, { v: 'coperto', l: 'Al coperto' }] }], 'Tutte');
   const fBp = _msFill('ss-bp', bpG, 'Tutti');
   // Aree di movimentazione (per destinazione della missione)
   const aree = (st.aree || []).slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
@@ -811,11 +811,11 @@ window.scaricaStoricoExcel = function () {
   const rows = _storicoRows;
   if (!rows.length) { showToast('Nessun movimento da scaricare.', 'error'); return; }
   try {
-    const head = ['Data', 'Ora', 'Stato', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Linea Rossa', 'Vuoto', 'Disimballo', 'Tipo di conferma'];
+    const head = ['Data', 'Ora', 'Stato', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Linea Rossa', 'Vuoto', 'Disimballo', 'Al coperto', 'Tipo di conferma'];
     const dati = rows.map(h => [
       ..._excelData(h.ts), (h.action === 'Pieno preso in carico' ? 'Preso in carico' : (h.action || '')), h.codice || '', h.elemento || '',
       h.origine || '', h.destinazione || '', h.userName || h.user || '',
-      h.lineaBlu ? 'Sì' : '', h.lineaRossa ? 'Sì' : '', h.vuoto ? 'Sì' : '', h.disimballo ? 'Sì' : '',
+      h.lineaBlu ? 'Sì' : '', h.lineaRossa ? 'Sì' : '', h.vuoto ? 'Sì' : '', h.disimballo ? 'Sì' : '', h.coperto ? 'Sì' : '',
       /barcode/i.test(h.dettaglio || '') ? 'B' : /manualmente/i.test(h.dettaglio || '') ? 'M' : '',
     ]);
     const bytes = _xlsxBytes(head, dati, [12, 10, 22, 17, 15, 20, 20, 22, 11, 12, 9, 12, 17]);

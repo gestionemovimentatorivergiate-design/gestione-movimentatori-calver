@@ -246,6 +246,20 @@ export function renderNuovaMissione() {
       anchor.parentNode.insertBefore(wrap, anchor.id === 'nm-btn' ? anchor : anchor.nextSibling);
     }
   }
+  // Spunta "Lasciare al coperto": sempre cliccabile, nessuna regola di compatibilità
+  if (!document.getElementById('nm-coperto')) {
+    const anchor = document.getElementById('nm-disimballo-wrap') || document.getElementById('nm-camion-wrap') || document.getElementById('nm-vuoto-wrap') || document.getElementById('nm-btn');
+    if (anchor && anchor.parentNode) {
+      const wrap = document.createElement('label');
+      wrap.id = 'nm-coperto-wrap';
+      wrap.style.cssText = 'display:flex;align-items:center;gap:10px;margin:12px 0;padding:10px 12px;' +
+        'border:1px solid #0891b255;border-radius:8px;background:#0891b212;cursor:pointer;' +
+        'font-weight:700;user-select:none';
+      wrap.innerHTML = '<input type="checkbox" id="nm-coperto" style="width:20px;height:20px;margin:0;accent-color:#0891b2;cursor:pointer">' +
+        '<span>☂️ Lasciare al coperto</span>';
+      anchor.parentNode.insertBefore(wrap, anchor.id === 'nm-btn' ? anchor : anchor.nextSibling);
+    }
+  }
   const cbDis = document.getElementById('nm-disimballo'); if (cbDis) cbDis.onchange = _aggiornaSpunte;
   const cbCamion = document.getElementById('nm-camion'); if (cbCamion) cbCamion.onchange = _aggiornaSpunte;
   orSel.onchange = () => { _filtraDestinazione(); _aggiornaSpunte(); };
@@ -361,6 +375,11 @@ function _badgeDisimballo(m) {
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#7c3aed;color:#fff;letter-spacing:.3px">📦 DISIMBALLO</span>'
     : '';
 }
+function _badgeCoperto(m) {
+  return m.coperto
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#0891b2;color:#fff;letter-spacing:.3px">☂️ AL COPERTO</span>'
+    : '';
+}
 function _badgeCamion(m) {
   return m.scaricoCamion
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#b45309;color:#fff;letter-spacing:.3px">🚛 SCARICO CAMION</span>'
@@ -410,6 +429,7 @@ window.creaMissione = async function () {
   const note = (document.getElementById('nm-note')?.value || '').trim().slice(0, 300);
   const rossaSel = !camion && !!document.getElementById('nm-linearossa')?.checked;
   const disimballo = !camion && !vuoto && !!document.getElementById('nm-disimballo')?.checked;
+  const coperto = !!document.getElementById('nm-coperto')?.checked;
   // Mutuamente esclusive: Linea Blu, Linea Rossa e Vuoto non vengono mai salvate insieme
   const lineaBlu = !camion && !vuoto && !rossaSel && !!document.getElementById('nm-lineablu')?.checked
     && origine.buildingId === LINEA_BLU_BUILDING;
@@ -436,6 +456,7 @@ window.creaMissione = async function () {
         lineaBlu, lineaRossa, vuoto, note,
         ...(camion ? { scaricoCamion: true } : {}),
         ...(disimballo ? { disimballo: true } : {}),
+        ...(coperto ? { coperto: true } : {}),
         stato: 'richiesta',
         navettaId: null, navettaNome: null,
         ownerUid: u.uid, ownerNome: u.name || u.email,
@@ -448,8 +469,9 @@ window.creaMissione = async function () {
       lineaBlu, lineaRossa, vuoto, note,
       ...(camion ? { scaricoCamion: true } : {}),
       ...(disimballo ? { disimballo: true } : {}),
+      ...(coperto ? { coperto: true } : {}),
     });
-    showToast(`Missione${camion ? ' SCARICO CAMION' : ''}${disimballo ? ' DISIMBALLO' : ''}${lineaBlu ? ' LINEA BLU' : ''}${lineaRossa ? ' LINEA ROSSA' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${camion ? 'da ' + origine.nome : elemento.codice + ' → ' + destinazione.nome}`, 'success');
+    showToast(`Missione${camion ? ' SCARICO CAMION' : ''}${disimballo ? ' DISIMBALLO' : ''}${coperto ? ' AL COPERTO' : ''}${lineaBlu ? ' LINEA BLU' : ''}${lineaRossa ? ' LINEA ROSSA' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${camion ? 'da ' + origine.nome : elemento.codice + ' → ' + destinazione.nome}`, 'success');
     // Reset selezioni
     document.getElementById('nm-elemento').value = '';
     document.getElementById('nm-origine').value = '';
@@ -461,6 +483,7 @@ window.creaMissione = async function () {
     const cv = document.getElementById('nm-vuoto'); if (cv) cv.checked = false;
     const cc = document.getElementById('nm-camion'); if (cc) cc.checked = false;
     const cd = document.getElementById('nm-disimballo'); if (cd) cd.checked = false;
+    const cp = document.getElementById('nm-coperto'); if (cp) cp.checked = false;
     _aggiornaSpunte();
   } catch (e) {
     showToast('Errore: ' + e.message, 'error');
@@ -501,6 +524,7 @@ function _cardMissioneAttesa(m) {
         ${_badgeRossa(m)}
         ${_badgeVuoto(m)}
         ${_badgeCamion(m)}
+        ${_badgeCoperto(m)}
         ${_badgeDisimballo(m)}
         <span class="mStatoBadge richiesta">In attesa</span>
       </div>
@@ -551,6 +575,7 @@ window.modificaMissione = function (id) {
     ${box('mm-rossa', '#dc2626', '🔴 Linea Rossa')}
     ${box('mm-vuoto', '#16a34a', '🟢 Vuoto')}
     ${box('mm-dis', '#7c3aed', '📦 Disimballo')}`}
+    ${box('mm-coperto', '#0891b2', '☂️ Lasciare al coperto')}
     <div class="modalActions">
       <button class="btnGray" id="mm-annulla">Chiudi</button>
       <button class="btnGreen" id="mm-salva">Salva modifiche</button>
@@ -559,6 +584,7 @@ window.modificaMissione = function (id) {
 
   const $ = x => document.getElementById(x);
   const camion = !!m.scaricoCamion;
+  $('mm-coperto').checked = !!m.coperto;
   if (!camion) { $('mm-blu').checked = !!m.lineaBlu; $('mm-rossa').checked = !!m.lineaRossa; $('mm-vuoto').checked = !!m.vuoto; $('mm-dis').checked = !!m.disimballo; }
 
   // Stesse regole della creazione: le tre spunte sono mutuamente esclusive e
@@ -596,13 +622,14 @@ window.modificaMissione = function (id) {
       lineaRossa: !camion && $('mm-rossa').checked,
       vuoto: !camion && $('mm-vuoto').checked,
       disimballo: !camion && !$('mm-vuoto').checked && $('mm-dis').checked,
+      coperto: $('mm-coperto').checked,
       note: ($('mm-note').value || '').trim().slice(0, 300),
     };
     const diff = [];
     if (nuovo.elementoId !== m.elementoId) diff.push(`Elemento: ${m.elementoCodice} → ${nuovo.elementoCodice}`);
     if (nuovo.origineId !== m.origineId) diff.push(`Origine: ${m.origineNome} → ${nuovo.origineNome}`);
     if (nuovo.destinazioneId !== m.destinazioneId) diff.push(`Destinazione: ${m.destinazioneNome} → ${nuovo.destinazioneNome}`);
-    [['lineaBlu', 'Linea Blu'], ['lineaRossa', 'Linea Rossa'], ['vuoto', 'Vuoto'], ['disimballo', 'Disimballo']].forEach(([k, lab]) => {
+    [['lineaBlu', 'Linea Blu'], ['lineaRossa', 'Linea Rossa'], ['vuoto', 'Vuoto'], ['disimballo', 'Disimballo'], ['coperto', 'Al coperto']].forEach(([k, lab]) => {
       if (!!m[k] !== !!nuovo[k]) diff.push(`${lab}: ${m[k] ? 'sì' : 'no'} → ${nuovo[k] ? 'sì' : 'no'}`);
     });
     if ((m.note || '') !== nuovo.note) diff.push(nuovo.note ? (m.note ? 'Note modificate' : 'Note aggiunte') : 'Note rimosse');
@@ -623,7 +650,7 @@ window.modificaMissione = function (id) {
       await window.logHistory({
         action: 'Missione modificata', codice: m.codice || null,
         elemento: nuovo.elementoCodice, origine: nuovo.origineNome, destinazione: nuovo.destinazioneNome,
-        lineaBlu: nuovo.lineaBlu, lineaRossa: nuovo.lineaRossa, vuoto: nuovo.vuoto, disimballo: nuovo.disimballo, note: nuovo.note,
+        lineaBlu: nuovo.lineaBlu, lineaRossa: nuovo.lineaRossa, vuoto: nuovo.vuoto, disimballo: nuovo.disimballo, coperto: nuovo.coperto, note: nuovo.note,
         dettaglio: diff.join(' · '),
       });
       ov.remove();

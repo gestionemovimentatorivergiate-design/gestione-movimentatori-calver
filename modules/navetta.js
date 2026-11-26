@@ -179,6 +179,9 @@ function _card(item) {
   const badgeDisimballo = item.disimballo
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#7c3aed;color:#fff;letter-spacing:.3px">📦 DISIMBALLO</span>'
     : '';
+  const badgeCoperto = item.coperto
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#0891b2;color:#fff;letter-spacing:.3px">☂️ AL COPERTO</span>'
+    : '';
   const badgeCamion = item.scaricoCamion
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#b45309;color:#fff;letter-spacing:.3px">🚛 SCARICO CAMION</span>'
     : '';
@@ -193,6 +196,7 @@ function _card(item) {
         ${badgeVuoto}
         ${badgeCamion}
         ${badgeDisimballo}
+        ${badgeCoperto}
         ${statoBadge}
       </div>
       <div class="mRoute"><span class="mLoc">${esc(item.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(item.destinazioneNome)}</span></div>
