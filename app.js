@@ -21,6 +21,7 @@ import { showToast } from './shared-utils.js';
 import { initOperativo, renderNuovaMissione, renderMieMissioni } from './modules/operativo.js';
 import { initNavetta, renderInCorso } from './modules/navetta.js';
 import { initAnagrafiche, renderElementi, renderUbicazioni, renderBuildings, renderAree, renderReparti } from './modules/anagrafiche.js';
+import { renderDisimballi } from './modules/disimballi.js';
 import { initAdmin, renderStorico, renderStatistiche, renderUtenti } from './modules/admin.js';
 
 // ── STATO CONDIVISO ─────────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ function refreshCurrentPage() {
     case 'Prenotazioni':  renderNuovaMissione(); renderMieMissioni(); break;
     case 'InCorso':       renderInCorso();       break;
     case 'Storico':       renderStorico();       break;
+    case 'Disimballi':    renderDisimballi();    break;
     case 'Statistiche':   renderStatistiche();   break;
     case 'Anagrafiche':   renderElementi(); renderBuildings(); renderUbicazioni(); renderAree(); renderReparti(); break;
     case 'Utenti':        renderUtenti();        break;

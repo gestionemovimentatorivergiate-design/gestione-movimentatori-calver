@@ -102,6 +102,8 @@
       <span class="navIcon">🚚</span>In corso</button>
     <button class="navBtn hidden" id="tab-storico"  data-page="Storico"       data-roles="amministrativo,amministratore">
       <span class="navIcon">🗂️</span>Storico</button>
+    <button class="navBtn hidden" id="tab-disimballi" data-page="Disimballi"  data-roles="amministrativo,amministratore">
+      <span class="navIcon">📦</span>Disimballi</button>
     <button class="navBtn hidden" id="tab-stats"    data-page="Statistiche"   data-roles="amministrativo,amministratore">
       <span class="navIcon">📊</span>Statistiche</button>
     <button class="navBtn hidden" id="tab-anag"     data-page="Anagrafiche"   data-roles="amministratore">
@@ -192,6 +194,19 @@
       <table>
         <thead><tr><th>Data</th><th>Ora</th><th>ID missione</th><th>Stato</th><th>Elemento</th><th>Percorso</th><th>Utente</th></tr></thead>
         <tbody id="st-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── PAGINA: DISIMBALLI (amministrativo/amministratore) ─────────────────── -->
+  <div class="page" id="pageDisimballi">
+    <div class="pageHeader">Disimballi</div>
+    <div class="pageSubtitle">Missioni completate con spunta Disimballo</div>
+    <div class="pageSubtitle" id="dis-count" style="margin-top:-4px"></div>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>Data</th><th>Ora conferma</th><th>ID missione</th><th>Elemento</th><th>Punto di conferma</th><th>Provenienza</th><th>Note</th></tr></thead>
+        <tbody id="dis-body"></tbody>
       </table>
     </div>
   </div>
