@@ -97,3 +97,63 @@ export function dialogElimina({ titolo, nome, nota, okLabel = '🗑 Elimina' }) 
     document.getElementById('del-back').focus();
   });
 }
+
+// ── Menu a selezione multipla con ricerca (usato da Storico e In corso) ───────
+const _msSel = new Map();                       // id → Set dei valori scelti
+if (!window.__msChiudi) {
+  window.__msChiudi = true;
+  document.addEventListener('click', e => {
+    document.querySelectorAll('.ms.open').forEach(r => { if (!r.contains(e.target)) r.classList.remove('open'); });
+  });
+}
+export function msClear(...ids) { ids.forEach(id => _msSel.set(id, new Set())); }
+// groups: [{label?, items:[{v,l}]}]; ritorna l'array dei valori scelti; onChange() a ogni modifica
+export function msFill(id, groups, tutti, onChange) {
+  const root = document.getElementById(id); if (!root) return [];
+  root._msOnChange = onChange;
+  const valide = new Set(groups.flatMap(g => g.items.map(i => i.v)));
+  const sel = new Set([...(_msSel.get(id) || [])].filter(v => valide.has(v)));
+  _msSel.set(id, sel);
+  const sig = JSON.stringify(groups);
+  if (root.dataset.sig !== sig) {
+    root.dataset.sig = sig; root.classList.add('ms');
+    root.innerHTML = '<button type="button" class="msBtn"></button><div class="msPanel">' +
+      '<input class="msSearch" placeholder="Cerca…" autocomplete="off"><div class="msList">' +
+      groups.map(g => (g.label ? `<div class="msGrp">${esc(g.label)}</div>` : '') +
+        g.items.map(i => `<label class="msOpt"><input type="checkbox" value="${esc(i.v)}"><span>${esc(i.l)}</span></label>`).join('')).join('') +
+      '</div><div class="msFoot"><button type="button" class="msClear">Deseleziona tutto</button></div></div>';
+    if (!root._msBound) {
+      root._msBound = true;
+      root.addEventListener('click', e => {
+        if (e.target.closest('.msBtn')) {
+          const apri = !root.classList.contains('open');
+          document.querySelectorAll('.ms.open').forEach(r => r.classList.remove('open'));
+          if (apri) root.classList.add('open');
+        } else if (e.target.closest('.msClear')) {
+          _msSel.set(id, new Set()); root._msOnChange && root._msOnChange();
+        }
+      });
+      root.addEventListener('change', e => {
+        const cb = e.target; if (cb.type !== 'checkbox') return;
+        const set = _msSel.get(id) || new Set();
+        if (cb.checked) set.add(cb.value); else set.delete(cb.value);
+        _msSel.set(id, set); root._msOnChange && root._msOnChange();
+      });
+      root.addEventListener('input', e => {
+        if (!e.target.classList.contains('msSearch')) return;
+        const q = e.target.value.trim().toLowerCase();
+        root.querySelectorAll('.msOpt').forEach(o => { o.style.display = !q || o.textContent.toLowerCase().includes(q) ? '' : 'none'; });
+      });
+    }
+  }
+  root.querySelectorAll('.msOpt input').forEach(cb => { cb.checked = sel.has(cb.value); });
+  const nomi = {}; groups.forEach(g => g.items.forEach(i => { nomi[i.v] = i.l; }));
+  root.querySelector('.msBtn').textContent = sel.size === 0 ? tutti : sel.size === 1 ? nomi[[...sel][0]] : sel.size + ' selezionati';
+  root.classList.toggle('sel', sel.size > 0);
+  return [...sel];
+}
+// Tipologie di missione (le spunte di Prenotazioni): campo della missione → etichetta
+export const TIPOLOGIE = [
+  { v: 'lineaBlu', l: '🔵 Linea Blu' }, { v: 'lineaRossa', l: '🔴 Linea Rossa' }, { v: 'vuoto', l: '🟢 Vuoto' },
+  { v: 'scaricoCamion', l: '🚛 Scarico camion' }, { v: 'disimballo', l: '📦 Disimballo' },
+];
