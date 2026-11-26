@@ -155,5 +155,5 @@ export function msFill(id, groups, tutti, onChange) {
 // Tipologie di missione (le spunte di Prenotazioni): campo della missione → etichetta
 export const TIPOLOGIE = [
   { v: 'lineaBlu', l: '🔵 Linea Blu' }, { v: 'lineaRossa', l: '🔴 Linea Rossa' }, { v: 'vuoto', l: '🟢 Vuoto' },
-  { v: 'scaricoCamion', l: '🚛 Scarico camion' }, { v: 'disimballo', l: '📦 Disimballo' },
+  { v: 'scaricoCamion', l: '🚛 Scarico camion' }, { v: 'disimballo', l: '📦 Disimballo' }, { v: 'coperto', l: '☂️ Al coperto' },
 ];
