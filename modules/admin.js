@@ -11,7 +11,7 @@ import {
   doc, getDoc, setDoc, updateDoc, deleteDoc,
   collection, getDocs, query, limit, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { showToast, esc, fmtDate, tsVal, dialogElimina } from '../shared-utils.js';
+import { showToast, esc, fmtDate, tsVal, dialogElimina, msFill, msClear, TIPOLOGIE } from '../shared-utils.js';
 
 let _getState, _getUser;
 
@@ -50,6 +50,7 @@ export function renderStorico() {
   const fPar = fill('st-partenza', H.map(h => h.origine),      'Tutti');
   const fArr = fill('st-arrivo',   H.map(h => h.destinazione), 'Tutti');
   const fConf = document.getElementById('st-conferma')?.value || '';
+  const fTip = msFill('st-tipologia', [{ items: TIPOLOGIE }], 'Tutte', renderStorico);
   const fData = document.getElementById('st-data')?.value || '';          // Dal, aaaa-mm-gg
   const fDataA = document.getElementById('st-data-a')?.value || '';       // Al, aaaa-mm-gg
   const fId = (document.getElementById('st-id')?.value || '').trim().toLowerCase();
@@ -57,12 +58,17 @@ export function renderStorico() {
 
   // Nessun filtro attivo → si mostrano solo i movimenti dell'ultima settimana.
   // Con almeno un filtro attivo la ricerca copre tutte le voci caricate.
-  const nessunFiltro = !fAz && !fUt && !fPer && !fPar && !fArr && !fEl && !fConf && !fData && !fDataA && !fId;
+  const nessunFiltro = !fAz && !fUt && !fPer && !fPar && !fArr && !fEl && !fConf && !fTip.length && !fData && !fDataA && !fId;
   const da = Date.now() - 7 * 24 * 3600 * 1000;
 
   // Una missione compare se almeno una sua voce rispetta TUTTI i filtri (AND);
   // della missione si vedono poi tutti gli stati.
   const chiave = h => h.codice || ('_' + h.id);
+  // Tipologia di una missione: dai dati della missione, altrimenti dalle voci di storico (creazione/modifica)
+  const missPerCod = new Map(_getState().missioni.map(m => [m.codice || m.id, m]));
+  const flagsStorico = new Map();
+  H.forEach(h => { const f = flagsStorico.get(chiave(h)) || {}; TIPOLOGIE.forEach(t => { if (h[t.v]) f[t.v] = true; }); flagsStorico.set(chiave(h), f); });
+  const tipologie = h => missPerCod.get(h.codice) || flagsStorico.get(chiave(h)) || {};
   // Il filtro Stato guarda lo stato ATTUALE della missione (la sua voce più recente)
   const tvH = h => h.ts ? h.ts.getTime() : Number.MAX_SAFE_INTEGER;
   const ultimo = new Map();
@@ -79,6 +85,7 @@ export function renderStorico() {
     (!fPar || h.origine === fPar) &&
     (!fArr || h.destinazione === fArr) &&
     (!fConf || confTipo(h) === fConf) &&
+    (!fTip.length || fTip.some(t => !!tipologie(h)[t])) &&
     (!fEl  || h.elemento === fEl) &&
     (!fData || giorno(h) >= fData) &&
     (!fDataA || (giorno(h) && giorno(h) <= fDataA)) &&
@@ -281,7 +288,7 @@ export function renderStatistiche() {
 
   const fOp = _msFill('ss-op', opG(ops), 'Tutti');
   const fEl = _msFill('ss-elemento', opG(els), 'Tutti');
-  const fTipo = _msFill('ss-tipo', [{ items: [{ v: 'lineaBlu', l: 'Linea Blu' }, { v: 'lineaRossa', l: 'Linea Rossa' }, { v: 'vuoto', l: 'Vuoti' }, { v: 'scaricoCamion', l: 'Scarico camion' }] }], 'Tutte');
+  const fTipo = _msFill('ss-tipo', [{ items: [{ v: 'lineaBlu', l: 'Linea Blu' }, { v: 'lineaRossa', l: 'Linea Rossa' }, { v: 'vuoto', l: 'Vuoti' }, { v: 'scaricoCamion', l: 'Scarico camion' }, { v: 'disimballo', l: 'Disimballo' }] }], 'Tutte');
   const fBp = _msFill('ss-bp', bpG, 'Tutti');
   // Aree di movimentazione (per destinazione della missione)
   const aree = (st.aree || []).slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'it', { numeric: true }));
@@ -804,14 +811,14 @@ window.scaricaStoricoExcel = function () {
   const rows = _storicoRows;
   if (!rows.length) { showToast('Nessun movimento da scaricare.', 'error'); return; }
   try {
-    const head = ['Data', 'Ora', 'Stato', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Linea Rossa', 'Vuoto', 'Tipo di conferma'];
+    const head = ['Data', 'Ora', 'Stato', 'ID missione', 'Elemento', 'Origine', 'Destinazione', 'Utente', 'Linea Blu', 'Linea Rossa', 'Vuoto', 'Disimballo', 'Tipo di conferma'];
     const dati = rows.map(h => [
       ..._excelData(h.ts), (h.action === 'Pieno preso in carico' ? 'Preso in carico' : (h.action || '')), h.codice || '', h.elemento || '',
       h.origine || '', h.destinazione || '', h.userName || h.user || '',
-      h.lineaBlu ? 'Sì' : '', h.lineaRossa ? 'Sì' : '', h.vuoto ? 'Sì' : '',
+      h.lineaBlu ? 'Sì' : '', h.lineaRossa ? 'Sì' : '', h.vuoto ? 'Sì' : '', h.disimballo ? 'Sì' : '',
       /barcode/i.test(h.dettaglio || '') ? 'B' : /manualmente/i.test(h.dettaglio || '') ? 'M' : '',
     ]);
-    const bytes = _xlsxBytes(head, dati, [12, 10, 22, 17, 15, 20, 20, 22, 11, 12, 9, 17]);
+    const bytes = _xlsxBytes(head, dati, [12, 10, 22, 17, 15, 20, 20, 22, 11, 12, 9, 12, 17]);
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
     const a = document.createElement('a');
@@ -829,6 +836,7 @@ window.resetFiltriStorico = function () {
   ['st-data', 'st-data-a', 'st-id', 'st-utente', 'st-percorso', 'st-partenza', 'st-arrivo', 'st-elemento', 'st-azione', 'st-conferma'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  msClear('st-tipologia');
   renderStorico();
 };
 

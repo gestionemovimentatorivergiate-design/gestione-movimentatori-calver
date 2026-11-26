@@ -231,6 +231,22 @@ export function renderNuovaMissione() {
       anchor.parentNode.insertBefore(wrap, anchor.id === 'nm-btn' ? anchor : anchor.nextSibling);
     }
   }
+  // Spunta "Disimballo": combinabile con Linea Blu / Rossa; non con Vuoto né Scarico camion
+  if (!document.getElementById('nm-disimballo')) {
+    const anchor = document.getElementById('nm-camion-wrap') || document.getElementById('nm-vuoto-wrap') || document.getElementById('nm-btn');
+    if (anchor && anchor.parentNode) {
+      const wrap = document.createElement('label');
+      wrap.id = 'nm-disimballo-wrap';
+      wrap.style.cssText = 'display:flex;align-items:center;gap:10px;margin:12px 0;padding:10px 12px;' +
+        'border:1px solid #7c3aed55;border-radius:8px;background:#7c3aed12;cursor:pointer;' +
+        'font-weight:700;user-select:none';
+      wrap.innerHTML = '<input type="checkbox" id="nm-disimballo" style="width:20px;height:20px;margin:0;accent-color:#7c3aed;cursor:pointer">' +
+        '<span>📦 Disimballo</span>' +
+        '<span id="nm-disimballo-hint" style="font-size:11px;font-weight:500;color:var(--muted);margin-left:auto"></span>';
+      anchor.parentNode.insertBefore(wrap, anchor.id === 'nm-btn' ? anchor : anchor.nextSibling);
+    }
+  }
+  const cbDis = document.getElementById('nm-disimballo'); if (cbDis) cbDis.onchange = _aggiornaSpunte;
   const cbCamion = document.getElementById('nm-camion'); if (cbCamion) cbCamion.onchange = _aggiornaSpunte;
   orSel.onchange = () => { _filtraDestinazione(); _aggiornaSpunte(); };
   const cbBlu = document.getElementById('nm-lineablu'); if (cbBlu) cbBlu.onchange = _aggiornaSpunte;
@@ -252,13 +268,15 @@ function _aggiornaSpunte() {
   const cbRossa = document.getElementById('nm-linearossa');
   const cbVuoto = document.getElementById('nm-vuoto');
   const cbCamion = document.getElementById('nm-camion');
+  const cbDis = document.getElementById('nm-disimballo');
   if (!cbBlu || !cbRossa || !cbVuoto) return;
+  const dis = !!cbDis && cbDis.checked;   // Disimballo spuntato: Vuoto e Scarico camion non sono scegliibili
 
   // Scarico camion: solo con il reparto RICEZIONE; esclude tutte le altre spunte e la destinazione
   const ricezione = _repartoRicezione();
   if (cbCamion && !ricezione) cbCamion.checked = false;
   const camion = !!cbCamion && cbCamion.checked;
-  const altraSel = cbBlu.checked || cbRossa.checked || cbVuoto.checked;
+  const altraSel = cbBlu.checked || cbRossa.checked || cbVuoto.checked || dis;
   const camionOk = !!cbCamion && ricezione && !altraSel;
   if (cbCamion) {
     cbCamion.disabled = !camionOk && !camion;
@@ -287,7 +305,18 @@ function _aggiornaSpunte() {
 
   const bluOk = !camion && origineOk && !cbRossa.checked && !cbVuoto.checked;
   const rossaOk = !camion && !cbBlu.checked && !cbVuoto.checked;
-  const vuotoOk = !camion && !cbBlu.checked && !cbRossa.checked;
+  const vuotoOk = !camion && !dis && !cbBlu.checked && !cbRossa.checked;
+
+  // Disimballo: non con Vuoto né con Scarico camion (in quel caso si toglie e non è cliccabile)
+  if (cbDis) {
+    if (cbVuoto.checked || camion) cbDis.checked = false;
+    const disOk = !cbVuoto.checked && !camion;
+    cbDis.disabled = !disOk;
+    const w = document.getElementById('nm-disimballo-wrap');
+    if (w) { w.style.opacity = disOk ? '1' : '.5'; w.style.cursor = disOk ? 'pointer' : 'not-allowed'; }
+    const h = document.getElementById('nm-disimballo-hint');
+    if (h) h.textContent = disOk ? '' : (camion ? 'Non compatibile con Scarico camion' : 'Non compatibile con Vuoto');
+  }
   cbBlu.disabled = !bluOk;
   cbRossa.disabled = !rossaOk;
   cbVuoto.disabled = !vuotoOk;
@@ -307,7 +336,7 @@ function _aggiornaSpunte() {
   const hRossa = document.getElementById('nm-linearossa-hint');
   if (hRossa) hRossa.textContent = rossaOk ? '' : camion ? altra('Scarico camion') : (cbBlu.checked ? altra('Linea Blu') : altra('Vuoto'));
   const hVuoto = document.getElementById('nm-vuoto-hint');
-  if (hVuoto) hVuoto.textContent = vuotoOk ? '' : camion ? altra('Scarico camion') : (cbBlu.checked ? altra('Linea Blu') : altra('Linea Rossa'));
+  if (hVuoto) hVuoto.textContent = vuotoOk ? '' : camion ? altra('Scarico camion') : dis ? altra('Disimballo') : (cbBlu.checked ? altra('Linea Blu') : altra('Linea Rossa'));
 }
 
 // Badge + stile per le missioni Linea Blu (priorità)
@@ -325,6 +354,11 @@ function _badgeRossa(m) {
 function _badgeVuoto(m) {
   return m.vuoto
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#16a34a;color:#fff;letter-spacing:.3px">🟢 VUOTO</span>'
+    : '';
+}
+function _badgeDisimballo(m) {
+  return m.disimballo
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#7c3aed;color:#fff;letter-spacing:.3px">📦 DISIMBALLO</span>'
     : '';
 }
 function _badgeCamion(m) {
@@ -375,6 +409,7 @@ window.creaMissione = async function () {
   const vuoto = !camion && !!document.getElementById('nm-vuoto')?.checked;
   const note = (document.getElementById('nm-note')?.value || '').trim().slice(0, 300);
   const rossaSel = !camion && !!document.getElementById('nm-linearossa')?.checked;
+  const disimballo = !camion && !vuoto && !!document.getElementById('nm-disimballo')?.checked;
   // Mutuamente esclusive: Linea Blu, Linea Rossa e Vuoto non vengono mai salvate insieme
   const lineaBlu = !camion && !vuoto && !rossaSel && !!document.getElementById('nm-lineablu')?.checked
     && origine.buildingId === LINEA_BLU_BUILDING;
@@ -400,6 +435,7 @@ window.creaMissione = async function () {
         destinazioneId: camion ? null : deId, destinazioneNome: destinazione.nome,
         lineaBlu, lineaRossa, vuoto, note,
         ...(camion ? { scaricoCamion: true } : {}),
+        ...(disimballo ? { disimballo: true } : {}),
         stato: 'richiesta',
         navettaId: null, navettaNome: null,
         ownerUid: u.uid, ownerNome: u.name || u.email,
@@ -411,8 +447,9 @@ window.creaMissione = async function () {
       origine: origine.nome, destinazione: destinazione.nome,
       lineaBlu, lineaRossa, vuoto, note,
       ...(camion ? { scaricoCamion: true } : {}),
+      ...(disimballo ? { disimballo: true } : {}),
     });
-    showToast(`Missione${camion ? ' SCARICO CAMION' : ''}${lineaBlu ? ' LINEA BLU' : ''}${lineaRossa ? ' LINEA ROSSA' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${camion ? 'da ' + origine.nome : elemento.codice + ' → ' + destinazione.nome}`, 'success');
+    showToast(`Missione${camion ? ' SCARICO CAMION' : ''}${disimballo ? ' DISIMBALLO' : ''}${lineaBlu ? ' LINEA BLU' : ''}${lineaRossa ? ' LINEA ROSSA' : ''}${vuoto ? ' VUOTO' : ''} creata ${codice}: ${camion ? 'da ' + origine.nome : elemento.codice + ' → ' + destinazione.nome}`, 'success');
     // Reset selezioni
     document.getElementById('nm-elemento').value = '';
     document.getElementById('nm-origine').value = '';
@@ -423,6 +460,7 @@ window.creaMissione = async function () {
     const cr = document.getElementById('nm-linearossa'); if (cr) cr.checked = false;
     const cv = document.getElementById('nm-vuoto'); if (cv) cv.checked = false;
     const cc = document.getElementById('nm-camion'); if (cc) cc.checked = false;
+    const cd = document.getElementById('nm-disimballo'); if (cd) cd.checked = false;
     _aggiornaSpunte();
   } catch (e) {
     showToast('Errore: ' + e.message, 'error');
@@ -463,6 +501,7 @@ function _cardMissioneAttesa(m) {
         ${_badgeRossa(m)}
         ${_badgeVuoto(m)}
         ${_badgeCamion(m)}
+        ${_badgeDisimballo(m)}
         <span class="mStatoBadge richiesta">In attesa</span>
       </div>
       <div class="mRoute"><span class="mLoc">${esc(m.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(m.destinazioneNome)}</span></div>
@@ -510,7 +549,8 @@ window.modificaMissione = function (id) {
     <div class="field"><label>Note <span class="opt">(facoltativo)</span></label><textarea id="mm-note" rows="2" maxlength="300" placeholder="Eventuali indicazioni per il movimentatore (non obbligatorio)">${esc(m.note || '')}</textarea></div>
     ${m.scaricoCamion ? '<div style="margin:8px 0;padding:10px 12px;border-radius:8px;background:#b4530912;border:1px solid #b4530955;font-weight:700">🚛 Scarico camion <span style="font-size:11px;font-weight:500;color:var(--muted)">(senza destinazione)</span></div>' : `${box('mm-blu', '#2563eb', '🔵 Linea Blu')}
     ${box('mm-rossa', '#dc2626', '🔴 Linea Rossa')}
-    ${box('mm-vuoto', '#16a34a', '🟢 Vuoto')}`}
+    ${box('mm-vuoto', '#16a34a', '🟢 Vuoto')}
+    ${box('mm-dis', '#7c3aed', '📦 Disimballo')}`}
     <div class="modalActions">
       <button class="btnGray" id="mm-annulla">Chiudi</button>
       <button class="btnGreen" id="mm-salva">Salva modifiche</button>
@@ -519,7 +559,7 @@ window.modificaMissione = function (id) {
 
   const $ = x => document.getElementById(x);
   const camion = !!m.scaricoCamion;
-  if (!camion) { $('mm-blu').checked = !!m.lineaBlu; $('mm-rossa').checked = !!m.lineaRossa; $('mm-vuoto').checked = !!m.vuoto; }
+  if (!camion) { $('mm-blu').checked = !!m.lineaBlu; $('mm-rossa').checked = !!m.lineaRossa; $('mm-vuoto').checked = !!m.vuoto; $('mm-dis').checked = !!m.disimballo; }
 
   // Stesse regole della creazione: le tre spunte sono mutuamente esclusive e
   // la Linea Blu richiede un'origine del building B26.
@@ -527,17 +567,18 @@ window.modificaMissione = function (id) {
     const ub = st.ubicazioni.find(x => x.id === $('mm-origine').value);
     const okB = !!ub && ub.buildingId === LINEA_BLU_BUILDING;
     if (!okB) $('mm-blu').checked = false;
-    const b = $('mm-blu').checked, r = $('mm-rossa').checked, v = $('mm-vuoto').checked;
-    const ok = { blu: okB && !r && !v, rossa: !b && !v, vuoto: !b && !r };
-    [['blu', 'mm-blu'], ['rossa', 'mm-rossa'], ['vuoto', 'mm-vuoto']].forEach(([k, cid]) => {
+    if ($('mm-vuoto').checked) $('mm-dis').checked = false;     // Disimballo non va con Vuoto
+    const b = $('mm-blu').checked, r = $('mm-rossa').checked, v = $('mm-vuoto').checked, d = $('mm-dis').checked;
+    const ok = { blu: okB && !r && !v, rossa: !b && !v, vuoto: !b && !r && !d, dis: !v };
+    [['blu', 'mm-blu'], ['rossa', 'mm-rossa'], ['vuoto', 'mm-vuoto'], ['dis', 'mm-dis']].forEach(([k, cid]) => {
       $(cid).disabled = !ok[k];
       $(cid + '-wrap').style.opacity = ok[k] ? '1' : '.5';
       $(cid + '-wrap').style.cursor = ok[k] ? 'pointer' : 'not-allowed';
-      $(cid + '-hint').textContent = ok[k] ? '' : (k === 'blu' && !okB ? `Solo per origini del building ${LINEA_BLU_BUILDING}` : 'Non compatibile con la spunta scelta');
+      $(cid + '-hint').textContent = ok[k] ? '' : (k === 'blu' && !okB ? `Solo per origini del building ${LINEA_BLU_BUILDING}` : k === 'dis' ? 'Non compatibile con Vuoto' : 'Non compatibile con la spunta scelta');
     });
   };
   if (!camion) {
-    ['mm-origine', 'mm-blu', 'mm-rossa', 'mm-vuoto'].forEach(x => { $(x).onchange = regole; });
+    ['mm-origine', 'mm-blu', 'mm-rossa', 'mm-vuoto', 'mm-dis'].forEach(x => { $(x).onchange = regole; });
     regole();
   }
 
@@ -554,13 +595,14 @@ window.modificaMissione = function (id) {
       lineaBlu: !camion && $('mm-blu').checked && orig.buildingId === LINEA_BLU_BUILDING,
       lineaRossa: !camion && $('mm-rossa').checked,
       vuoto: !camion && $('mm-vuoto').checked,
+      disimballo: !camion && !$('mm-vuoto').checked && $('mm-dis').checked,
       note: ($('mm-note').value || '').trim().slice(0, 300),
     };
     const diff = [];
     if (nuovo.elementoId !== m.elementoId) diff.push(`Elemento: ${m.elementoCodice} → ${nuovo.elementoCodice}`);
     if (nuovo.origineId !== m.origineId) diff.push(`Origine: ${m.origineNome} → ${nuovo.origineNome}`);
     if (nuovo.destinazioneId !== m.destinazioneId) diff.push(`Destinazione: ${m.destinazioneNome} → ${nuovo.destinazioneNome}`);
-    [['lineaBlu', 'Linea Blu'], ['lineaRossa', 'Linea Rossa'], ['vuoto', 'Vuoto']].forEach(([k, lab]) => {
+    [['lineaBlu', 'Linea Blu'], ['lineaRossa', 'Linea Rossa'], ['vuoto', 'Vuoto'], ['disimballo', 'Disimballo']].forEach(([k, lab]) => {
       if (!!m[k] !== !!nuovo[k]) diff.push(`${lab}: ${m[k] ? 'sì' : 'no'} → ${nuovo[k] ? 'sì' : 'no'}`);
     });
     if ((m.note || '') !== nuovo.note) diff.push(nuovo.note ? (m.note ? 'Note modificate' : 'Note aggiunte') : 'Note rimosse');
@@ -581,7 +623,7 @@ window.modificaMissione = function (id) {
       await window.logHistory({
         action: 'Missione modificata', codice: m.codice || null,
         elemento: nuovo.elementoCodice, origine: nuovo.origineNome, destinazione: nuovo.destinazioneNome,
-        lineaBlu: nuovo.lineaBlu, lineaRossa: nuovo.lineaRossa, vuoto: nuovo.vuoto, note: nuovo.note,
+        lineaBlu: nuovo.lineaBlu, lineaRossa: nuovo.lineaRossa, vuoto: nuovo.vuoto, disimballo: nuovo.disimballo, note: nuovo.note,
         dettaglio: diff.join(' · '),
       });
       ov.remove();

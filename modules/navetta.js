@@ -16,7 +16,7 @@
 import {
   doc, runTransaction, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { showToast, esc, fmtDur, tsVal } from '../shared-utils.js';
+import { showToast, esc, fmtDur, tsVal, msFill, msClear, TIPOLOGIE } from '../shared-utils.js';
 
 let _getState, _getUser;
 
@@ -75,7 +75,8 @@ export function renderInCorso() {
     oSel.value = punti.some(x => x.id === cur) ? cur : '';
     origId = oSel.value;
   }
-  const inArea = m => (!area || (area.puntiIds || []).includes(m.destinazioneId)) && (!reparto || (reparto.puntiIds || []).includes(m.origineId)) && (!origId || m.origineId === origId);
+  const fTip = msFill('ic-tipologia', [{ items: TIPOLOGIE }], 'Tutte', renderInCorso);
+  const inArea = m => (!fTip.length || fTip.some(t => !!m[t])) && (!area || (area.puntiIds || []).includes(m.destinazioneId)) && (!reparto || (reparto.puntiIds || []).includes(m.origineId)) && (!origId || m.origineId === origId);
 
   // Da prendere
   const avTutte = st.missioni.filter(m => m.stato === 'richiesta');
@@ -89,7 +90,7 @@ export function renderInCorso() {
 
   const nascoste = (avTutte.length - avMiss.length) + (tkTutte.length - tkMiss.length);
   const nEl = document.getElementById('ic-nascoste');
-  if (nEl) nEl.textContent = (area || reparto || origId) && nascoste ? `${nascoste} ${nascoste === 1 ? 'missione nascosta' : 'missioni nascoste'} dai filtri` : '';
+  if (nEl) nEl.textContent = (area || reparto || origId || fTip.length) && nascoste ? `${nascoste} ${nascoste === 1 ? 'missione nascosta' : 'missioni nascoste'} dai filtri` : '';
 
   // Un'unica lista: prima le missioni LINEA BLU, poi tutto il resto; a parità
   // ordinata per anzianità. Prendere un elemento non lo sposta di posizione
@@ -110,7 +111,7 @@ export function renderInCorso() {
       <div class="statCard green"><div class="val">${tkMiss.length}</div><div class="lbl">In carico</div></div>`;
   }
 
-  if (!lista.length) { el.innerHTML = (area || reparto || fStato || origId) ? '<div class="emptyState">Nessuna missione con questi filtri. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
+  if (!lista.length) { el.innerHTML = (area || reparto || fStato || origId || fTip.length) ? '<div class="emptyState">Nessuna missione con questi filtri. 👍</div>' : '<div class="emptyState">Nulla in corso. 👍</div>'; return; }
   el.innerHTML = lista.map(_card).join('');
 }
 
@@ -121,6 +122,7 @@ window.renderInCorso = renderInCorso;
 window.resetFiltriInCorso = function () {
   const u = _getUser();
   ['ic-area', 'ic-reparto', 'ic-stato', 'ic-origine'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  msClear('ic-tipologia');
   try { localStorage.setItem('areaInCorso:' + u.uid, ''); localStorage.setItem('repartoInCorso:' + u.uid, ''); } catch (e) {}
   renderInCorso();
 };
@@ -174,6 +176,9 @@ function _card(item) {
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#16a34a;color:#fff;letter-spacing:.3px">🟢 VUOTO</span>'
     : '';
 
+  const badgeDisimballo = item.disimballo
+    ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#7c3aed;color:#fff;letter-spacing:.3px">📦 DISIMBALLO</span>'
+    : '';
   const badgeCamion = item.scaricoCamion
     ? '<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:#b45309;color:#fff;letter-spacing:.3px">🚛 SCARICO CAMION</span>'
     : '';
@@ -187,6 +192,7 @@ function _card(item) {
         ${badgeRossa}
         ${badgeVuoto}
         ${badgeCamion}
+        ${badgeDisimballo}
         ${statoBadge}
       </div>
       <div class="mRoute"><span class="mLoc">${esc(item.origineNome)}</span><span class="mArrow">→</span><span class="mLoc">${esc(item.destinazioneNome)}</span></div>
